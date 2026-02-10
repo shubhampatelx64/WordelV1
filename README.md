@@ -1,106 +1,82 @@
-# WordelV1 (Phase 1)
+# WordelV1 (Phase 2)
 
-Production-focused Wordle-like app with Next.js App Router + Prisma + PostgreSQL + NextAuth Credentials.
-
-## Stack
-- Next.js 14 + TypeScript + Tailwind
-- PostgreSQL + Prisma (with migrations)
-- NextAuth (Credentials)
-- Vitest (unit tests)
-- Playwright (2 smoke tests)
+Next.js + TypeScript + Tailwind + Prisma/PostgreSQL Wordle platform with daily, custom, and practice games.
 
 ## Setup
-1. Copy env file:
-   ```bash
-   cp .env.example .env
-   ```
-2. Start postgres (docker):
-   ```bash
-   docker compose up -d postgres
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-4. Run migrations + generate client + seed:
-   ```bash
-   npm run prisma:generate
-   npm run prisma:migrate
-   npm run prisma:seed
-   ```
-5. Start app:
-   ```bash
-   npm run dev
-   ```
+1. `cp .env.example .env`
+2. `npm install`
+3. Start Postgres (`docker compose up -d postgres`) or full stack (`docker compose up --build`)
+4. `npm run prisma:generate`
+5. `npm run prisma:migrate`
+6. `npm run prisma:seed`
+7. `npm run dev`
 
-## One-command tests
-```bash
-npm run test:all
-```
+## Single-command tests
+- Unit + e2e: `npm run test:all`
 
-## Docker Compose (app + postgres)
-```bash
-docker compose up --build
-```
-This runs migrations and seed on app start.
+## Docker compose
+`docker compose up --build` starts app + postgres and runs migrate+seed on app startup.
 
-## Seeded credentials
+## Seeded users
 - Admin: `admin@example.com` / `Admin123!`
+- Creator: `creator@example.com` / `Creator123!`
 - User: `player@example.com` / `Password123!`
 
-## API routes (consistent JSON)
-All endpoints return either:
-- Success: `{ ok: true, data: ... }`
-- Error: `{ ok: false, error: { code, message, details? } }`
+## Core architecture
+- Shared server logic: `lib/server/*`
+- Domain logic: `lib/domain/*`
+  - Evaluation algorithm: `lib/domain/evaluate.ts`
+  - Scoring: `lib/domain/scoring.ts`
+  - Hint sequencing: `lib/domain/hints.ts`
+- API route handlers orchestrate auth/validation/domain only.
 
+## JSON response contract
+All API responses use:
+- success: `{ ok: true, data: ... }`
+- error: `{ ok: false, error: { code, message, details? } }`
+
+## API routes
 ### Auth
-- `POST /api/auth/signup`
-  - Body: `{ email, password, displayName }`
-  - Validates via zod, hashes password with bcryptjs, creates user.
-- `POST/GET /api/auth/[...nextauth]`
-  - NextAuth credentials login/logout/session endpoints.
+- `POST /api/auth/signup` body `{ email, password, displayName }`
+- `GET|POST /api/auth/[...nextauth]`
 
-### Daily game
-- `GET /api/daily?date=YYYY-MM-DD`
-  - Returns active daily game metadata only (never answer).
+### Daily/public
+- `GET /api/daily?date=YYYY-MM-DD&length=5&difficulty=medium`
+- `GET /api/g/:shareCode`
+- `GET /api/leaderboard/daily?date=YYYY-MM-DD&limit=20&length=5&difficulty=medium`
+- `GET /api/leaderboard/game/:gameId`
+- `POST /api/practice/start`
 
 ### Gameplay
-- `POST /api/games/:gameId/start`
-  - Body: `{ hardMode?: boolean }`
-  - Creates gameplay or resumes in-progress gameplay.
-  - Returns 409 if already completed (replay prevention).
-- `POST /api/games/:gameId/guess`
-  - Body: `{ guessText }`
-  - Validates length, A-Z only, dictionary membership, hard mode constraints.
-  - Evaluates duplicates with Wordle rules.
-  - Computes score server-side only and updates leaderboard on completion.
+- `POST /api/games/:gameId/start` body `{ hardMode?: boolean }`
+- `POST /api/games/:gameId/guess` body `{ guessText }`
 - `GET /api/games/:gameId/state`
-  - Returns guesses/status/attempt counts for refresh-resume flows.
-
-### Leaderboard
-- `GET /api/leaderboard/daily?date=YYYY-MM-DD&limit=20`
-  - Sorted by score desc, attempts asc, time asc, completion asc.
+- `POST /api/games/:gameId/hint`
 
 ### Profile
 - `GET /api/me/stats`
-  - Returns streak, win rate, and last 10 results.
 
-### Hint (Phase 1)
-- `POST /api/hint`
-  - Rate-limited endpoint that intentionally returns 501 in Phase 1.
+### Admin
+- `GET|POST|PUT|DELETE /api/admin/words`
+- `POST /api/admin/words/import` (JSON rows from parsed CSV preview)
+- `POST /api/admin/daily/schedule` body type assign/autofill
+- `GET|POST|PUT /api/admin/games`
+- `GET|PUT /api/admin/users`
+- `GET /api/admin/audit`
 
-## Architecture
-- Shared server utils: `lib/server/*`
-- Domain logic:
-  - Evaluation algorithm: `lib/domain/evaluate.ts`
-  - Hard mode rules: `lib/domain/hard-mode.ts`
-  - Scoring: `lib/domain/scoring.ts`
-- HTTP handlers only orchestrate validation/auth/domain usage.
+## Security notes
+- Answer word is never returned by API.
+- Score and penalties are computed server-side only.
+- UTC date keys are used (`YYYY-MM-DD`) at 00:00 UTC rollover.
+- Rate limiting is applied to login, guess, and hint.
+- Basic security headers are set in middleware.
+- Same-origin CSRF checks are used on mutating custom endpoints.
 
-## Security & correctness notes
-- Answer word is never returned to client.
-- Score is computed server-side only.
-- Rate limiting implemented for login (via NextAuth credentials path and signup), guess, and hint.
-- Security headers are set in middleware.
-- CSRF same-origin checks for mutating custom endpoints.
-- UTC dateKey (`YYYY-MM-DD`) used for daily rollover.
+## Phase 2 features
+- Roles: ADMIN/CREATOR/USER with route-level permission checks
+- Hints (0-3 per word), ordered retrieval, stored hint usage, score penalties
+- Custom games with share code and per-game leaderboard
+- Practice mode game creation
+- Daily schedule assign + autofill
+- Audit logging for admin/creator actions
+- Admin pages (`/admin`, `/admin/audit`) and share page (`/g/:shareCode`)

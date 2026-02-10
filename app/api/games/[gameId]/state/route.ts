@@ -7,7 +7,7 @@ export async function GET(_: Request, { params }: { params: { gameId: string } }
   if (!user) return fail('UNAUTHORIZED', 'Login required', 401);
   const gamePlay = await prisma.gamePlay.findUnique({
     where: { gameId_userId: { gameId: params.gameId, userId: user.id } },
-    include: { guesses: { orderBy: { createdAt: 'asc' } }, game: true }
+    include: { guesses: { orderBy: { createdAt: 'asc' } }, game: true, hintUses: { include: { hint: true }, orderBy: { usedAt: 'asc' } } }
   });
   if (!gamePlay) return fail('NOT_FOUND', 'No gameplay found. Start first.', 404);
 
@@ -17,6 +17,9 @@ export async function GET(_: Request, { params }: { params: { gameId: string } }
     attemptsUsed: gamePlay.attemptsUsed,
     remainingAttempts: gamePlay.game.maxAttempts - gamePlay.attemptsUsed,
     hardMode: gamePlay.hardMode,
-    guesses: gamePlay.guesses.map((g) => ({ guessText: g.guessText, resultPattern: g.resultPattern, createdAt: g.createdAt }))
+    hintsUsed: gamePlay.hintsUsed,
+    hintPenalty: gamePlay.hintPenalty,
+    hints: gamePlay.hintUses.map((u) => ({ id: u.hint.id, type: u.hint.type, content: u.hint.content, cost: u.hint.cost, order: u.hint.order })),
+    guesses: gamePlay.guesses.map((g: any) => ({ guessText: g.guessText, resultPattern: g.resultPattern, createdAt: g.createdAt }))
   });
 }

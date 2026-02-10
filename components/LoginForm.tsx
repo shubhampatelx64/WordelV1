@@ -17,7 +17,7 @@ export function LoginForm() {
       if (res?.error) setError('Invalid credentials');
       else router.push('/daily');
     }}>
-      <input className="border p-2 block" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <input type="email" className="border p-2 block" value={email} onChange={(e) => setEmail(e.target.value)} />
       <input className="border p-2 block" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
       <button className="bg-black text-white px-3 py-1" type="submit">Login</button>
       <button className="border px-3 py-1 ml-2" type="button" onClick={() => signOut({ callbackUrl: '/login' })}>Logout</button>

@@ -12,6 +12,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <Link href="/profile">Profile</Link>
           <Link href="/login">Login</Link>
           <Link href="/signup">Sign Up</Link>
+          <Link href="/admin">Admin</Link>
         </nav>
         <main className="max-w-3xl mx-auto p-4">{children}</main>
       </body>

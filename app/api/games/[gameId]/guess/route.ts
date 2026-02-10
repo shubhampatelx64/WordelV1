@@ -28,6 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: { gameId: str
     const gamePlay = await tx.gamePlay.findUnique({
       where: { gameId_userId: { gameId: params.gameId, userId: user.id } },
       include: {
+        hintUses: { include: { hint: true } },
         guesses: { orderBy: { createdAt: 'asc' } },
         game: { include: { answerWord: true } }
       }
@@ -38,8 +39,10 @@ export async function POST(req: NextRequest, { params }: { params: { gameId: str
     if (guessText.length !== gamePlay.game.length) return fail('VALIDATION_ERROR', 'Guess has wrong length', 400);
     if (!/^[A-Z]+$/.test(guessText)) return fail('VALIDATION_ERROR', 'Guess must contain A-Z only', 400);
 
-    const allowed = await tx.word.findUnique({ where: { text: guessText } });
-    if (!allowed || !allowed.isActive) return fail('INVALID_WORD', 'Guess is not in dictionary', 400);
+    if (gamePlay.game.dictionaryMode === 'STRICT') {
+      const allowed = await tx.word.findUnique({ where: { text: guessText } });
+      if (!allowed || !allowed.isActive) return fail('INVALID_WORD', 'Guess is not in dictionary', 400);
+    }
 
     if (gamePlay.hardMode) {
       const ruleError = validateHardMode(
@@ -57,25 +60,31 @@ export async function POST(req: NextRequest, { params }: { params: { gameId: str
     const status = isWin ? 'WIN' : isLoss ? 'LOSS' : 'IN_PROGRESS';
     const completedAt = status === 'IN_PROGRESS' ? null : new Date();
     const timeMs = completedAt ? completedAt.getTime() - gamePlay.startedAt.getTime() : gamePlay.timeMs;
-    const score = status === 'IN_PROGRESS' ? 0 : calculateScore(status, attemptsUsed, timeMs);
+    const hintPenalty = gamePlay.hintUses.reduce((sum, h) => sum + h.hint.cost, 0);
+    const score = status === 'IN_PROGRESS' ? 0 : calculateScore(status, attemptsUsed, timeMs, hintPenalty, gamePlay.hardMode);
 
     await tx.guess.create({ data: { gamePlayId: gamePlay.id, guessText, resultPattern: pattern } });
     const updated = await tx.gamePlay.update({
       where: { id: gamePlay.id },
-      data: { attemptsUsed, status, completedAt, timeMs, score }
+      data: { attemptsUsed, status, completedAt, timeMs, score, hintPenalty, hintsUsed: gamePlay.hintUses.length }
     });
 
     if (status !== 'IN_PROGRESS') {
+      const scope = gamePlay.game.mode === 'DAILY' ? 'DAILY' : gamePlay.game.mode === 'CUSTOM' ? 'CUSTOM' : 'PRACTICE';
+      const scopeKey = gamePlay.game.mode === 'DAILY' ? (gamePlay.game.dateKey ?? '') : gamePlay.gameId;
       await tx.leaderboardEntry.upsert({
         where: { gameId_userId: { gameId: gamePlay.gameId, userId: user.id } },
-        update: { score, attemptsUsed, timeMs },
+        update: { score, attemptsUsed, timeMs, hintPenalty, scope, scopeKey, dateKey: gamePlay.game.dateKey },
         create: {
           dateKey: gamePlay.game.dateKey,
           gameId: gamePlay.gameId,
           userId: user.id,
+          scope,
+          scopeKey,
           score,
           attemptsUsed,
-          timeMs
+          timeMs,
+          hintPenalty
         }
       });
     }
@@ -85,7 +94,9 @@ export async function POST(req: NextRequest, { params }: { params: { gameId: str
       attemptsUsed: updated.attemptsUsed,
       remainingAttempts: gamePlay.game.maxAttempts - updated.attemptsUsed,
       status: updated.status,
-      score: updated.score
+      score: updated.score,
+      hintPenalty: updated.hintPenalty,
+      hintsUsed: updated.hintsUsed
     });
   }, { isolationLevel: 'Serializable' });
 }

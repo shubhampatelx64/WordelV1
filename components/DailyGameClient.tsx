@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 type GuessRow = { guessText: string; resultPattern: string };
 
-export function DailyGameClient() {
+export function DailyGameClient({ shareCode }: { shareCode?: string }) {
   const [game, setGame] = useState<any>(null);
   const [gameplayId, setGameplayId] = useState<string | null>(null);
   const [guesses, setGuesses] = useState<GuessRow[]>([]);
@@ -12,14 +12,16 @@ export function DailyGameClient() {
   const [input, setInput] = useState('');
   const [hardMode, setHardMode] = useState(false);
   const [message, setMessage] = useState('');
+  const [hints, setHints] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
-      const daily = await fetch('/api/daily').then((r) => r.json());
+      const url = shareCode ? `/api/g/${shareCode}` : '/api/daily';
+      const daily = await fetch(url).then((r) => r.json());
       if (!daily.ok) return setMessage(daily.error.message);
       setGame(daily.data);
     })();
-  }, []);
+  }, [shareCode]);
 
   useEffect(() => {
     if (!game) return;
@@ -58,16 +60,27 @@ export function DailyGameClient() {
     setInput('');
   }
 
+  async function requestHint() {
+    if (!game) return;
+    const res = await fetch(`/api/games/${game.id}/hint`, { method: 'POST' });
+    const json = await res.json();
+    if (!json.ok) return setMessage(json.error.message);
+    setHints((prev) => [...prev, json.data.hint]);
+  }
+
   const keyboard = 'QWERTYUIOPASDFGHJKLZXCVBNM'.split('');
+  const len = game?.length ?? 5;
 
   return (
     <div className="space-y-4">
       <label className="flex items-center gap-2"><input type="checkbox" checked={hardMode} onChange={(e) => setHardMode(e.target.checked)} /> Hard Mode</label>
       {message && <p className="text-red-600">{message}</p>}
+      <button className="bg-purple-600 text-white px-3 py-1" onClick={requestHint}>Get hint</button>
+      <ul>{hints.map((h) => <li key={h.id}>{h.type}: {h.content} (-{h.cost})</li>)}</ul>
       <div className="grid gap-1">
         {rows.map((row, i) => (
-          <div className="grid grid-cols-5 gap-1" key={i}>
-            {Array.from({ length: 5 }).map((_, j) => {
+          <div className="grid gap-1" key={i} style={{ gridTemplateColumns: `repeat(${len}, minmax(0, 1fr))` }}>
+            {Array.from({ length: len }).map((_, j) => {
               const ch = row.guessText[j] ?? '';
               const pattern = row.resultPattern[j] ?? 'B';
               const color = pattern === 'G' ? 'bg-green-500' : pattern === 'Y' ? 'bg-yellow-500' : 'bg-gray-300';
@@ -77,12 +90,12 @@ export function DailyGameClient() {
         ))}
       </div>
       <div className="flex gap-2">
-        <input value={input} onChange={(e) => setInput(e.target.value.toUpperCase())} maxLength={5} className="border p-2" />
+        <input value={input} onChange={(e) => setInput(e.target.value.toUpperCase())} maxLength={len} className="border p-2" />
         <button className="bg-black text-white px-3" onClick={() => submitGuess(input)}>Guess</button>
       </div>
       <div className="flex flex-wrap gap-1">
         {keyboard.map((k) => (
-          <button key={k} className="border px-2" onClick={() => setInput((v) => (v + k).slice(0, 5))}>{k}</button>
+          <button key={k} className="border px-2" onClick={() => setInput((v) => (v + k).slice(0, len))}>{k}</button>
         ))}
         <button className="border px-2" onClick={() => setInput((v) => v.slice(0, -1))}>⌫</button>
       </div>

@@ -19,11 +19,22 @@ export async function POST(req: NextRequest, { params }: { params: { gameId: str
 
   const game = await prisma.game.findUnique({ where: { id: params.gameId } });
   if (!game || !game.isActive) return fail('NOT_FOUND', 'Game not found', 404);
+  if (game.startAt && game.startAt > new Date()) return fail('FORBIDDEN', 'Game not started yet', 403);
+  if (game.endAt && game.endAt < new Date()) return fail('FORBIDDEN', 'Game ended', 403);
 
   const existing = await prisma.gamePlay.findUnique({ where: { gameId_userId: { gameId: game.id, userId: user.id } } });
   if (existing) {
     if (existing.status !== 'IN_PROGRESS') {
-      return fail('REPLAY_FORBIDDEN', 'Daily game already completed', 409);
+      if (game.mode === 'DAILY' || !game.allowReplay) {
+        return fail('REPLAY_FORBIDDEN', 'Game already completed', 409);
+      }
+      const replay = await prisma.gamePlay.update({
+        where: { id: existing.id },
+        data: { status: 'IN_PROGRESS', attemptsUsed: 0, timeMs: 0, score: 0, hintsUsed: 0, hintPenalty: 0, completedAt: null }
+      });
+      await prisma.guess.deleteMany({ where: { gamePlayId: replay.id } });
+      await prisma.hintUse.deleteMany({ where: { gamePlayId: replay.id } });
+      return ok({ gameplayId: replay.id, status: replay.status, resumed: false });
     }
     return ok({ gameplayId: existing.id, status: existing.status, resumed: true });
   }
