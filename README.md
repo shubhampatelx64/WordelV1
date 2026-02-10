@@ -17,13 +17,6 @@ Next.js + TypeScript + Tailwind + Prisma/PostgreSQL Wordle platform with daily, 
 ## Docker compose
 `docker compose up --build` starts app + postgres and runs migrate+seed on app startup.
 
-The app service is bound to port `10000` (`http://localhost:10000`).
-
-## Render Docker deployment
-- Use `npm run start` as the container start command.
-- The start script binds Next.js to `0.0.0.0:10000` (`next start -H 0.0.0.0 -p 10000`), so Render can detect the open HTTP port.
-- Render uses port `10000` by default for Docker services and expects your process to listen on that port/interface during its port scan. Binding to another fixed port (like `3000`) can cause deployment health-check timeouts.
-
 ## Seeded users
 - Admin: `admin@example.com` / `Admin123!`
 - Creator: `creator@example.com` / `Creator123!`
