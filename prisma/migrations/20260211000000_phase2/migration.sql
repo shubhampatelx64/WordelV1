@@ -1,0 +1,103 @@
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'CREATOR';
+ALTER TYPE "GameMode" ADD VALUE IF NOT EXISTS 'CUSTOM';
+ALTER TYPE "GameMode" ADD VALUE IF NOT EXISTS 'PRACTICE';
+
+CREATE TYPE "DictionaryMode" AS ENUM ('STRICT', 'RELAXED');
+CREATE TYPE "HintType" AS ENUM ('DEFINITION', 'CATEGORY', 'SYNONYM', 'RIDDLE', 'FIRST_LETTER');
+CREATE TYPE "LeaderboardScope" AS ENUM ('DAILY', 'CUSTOM', 'PRACTICE');
+
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bannedAt" TIMESTAMP(3);
+ALTER TABLE "Word" ADD COLUMN IF NOT EXISTS "tags" TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "Word" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "allowReplay" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "creatorUserId" TEXT;
+ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "shareCode" TEXT;
+ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "startAt" TIMESTAMP(3);
+ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "endAt" TIMESTAMP(3);
+ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "dictionaryMode" "DictionaryMode" NOT NULL DEFAULT 'STRICT';
+ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "difficulty" TEXT NOT NULL DEFAULT 'medium';
+ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "Game" ALTER COLUMN "dateKey" DROP NOT NULL;
+
+ALTER TABLE "GamePlay" ADD COLUMN IF NOT EXISTS "hintPenalty" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "GamePlay" ADD COLUMN IF NOT EXISTS "hintsUsed" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "LeaderboardEntry" ADD COLUMN IF NOT EXISTS "scope" "LeaderboardScope" NOT NULL DEFAULT 'DAILY';
+ALTER TABLE "LeaderboardEntry" ADD COLUMN IF NOT EXISTS "scopeKey" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "LeaderboardEntry" ADD COLUMN IF NOT EXISTS "hintPenalty" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "LeaderboardEntry" ALTER COLUMN "dateKey" DROP NOT NULL;
+
+DROP INDEX IF EXISTS "LeaderboardEntry_dateKey_gameId_score_idx";
+CREATE INDEX IF NOT EXISTS "LeaderboardEntry_scope_scopeKey_score_idx" ON "LeaderboardEntry"("scope", "scopeKey", "score" DESC);
+CREATE INDEX IF NOT EXISTS "Game_dateKey_length_difficulty_idx" ON "Game"("dateKey", "length", "difficulty");
+CREATE INDEX IF NOT EXISTS "Game_shareCode_idx" ON "Game"("shareCode");
+
+DO $$ BEGIN
+  ALTER TABLE "Game" ADD CONSTRAINT "Game_creatorUserId_fkey" FOREIGN KEY ("creatorUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "Hint" (
+  "id" TEXT NOT NULL,
+  "wordId" TEXT NOT NULL,
+  "type" "HintType" NOT NULL,
+  "content" TEXT NOT NULL,
+  "cost" INTEGER NOT NULL,
+  "order" INTEGER NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "Hint_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Hint_wordId_order_key" ON "Hint"("wordId", "order");
+
+DO $$ BEGIN
+  ALTER TABLE "Hint" ADD CONSTRAINT "Hint_wordId_fkey" FOREIGN KEY ("wordId") REFERENCES "Word"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "HintUse" (
+  "id" TEXT NOT NULL,
+  "gamePlayId" TEXT NOT NULL,
+  "hintId" TEXT NOT NULL,
+  "usedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "HintUse_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "HintUse_gamePlayId_hintId_key" ON "HintUse"("gamePlayId", "hintId");
+DO $$ BEGIN
+  ALTER TABLE "HintUse" ADD CONSTRAINT "HintUse_gamePlayId_fkey" FOREIGN KEY ("gamePlayId") REFERENCES "GamePlay"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
+  ALTER TABLE "HintUse" ADD CONSTRAINT "HintUse_hintId_fkey" FOREIGN KEY ("hintId") REFERENCES "Hint"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "AuditLog" (
+  "id" TEXT NOT NULL,
+  "actorUserId" TEXT NOT NULL,
+  "action" TEXT NOT NULL,
+  "targetType" TEXT NOT NULL,
+  "targetId" TEXT,
+  "metadata" JSONB NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "AuditLog_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");
+CREATE INDEX IF NOT EXISTS "AuditLog_action_targetType_idx" ON "AuditLog"("action", "targetType");
+DO $$ BEGIN
+  ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_actorUserId_fkey" FOREIGN KEY ("actorUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+DROP INDEX IF EXISTS "Game_mode_dateKey_length_key";
+CREATE UNIQUE INDEX IF NOT EXISTS "Game_mode_dateKey_length_difficulty_key" ON "Game"("mode", "dateKey", "length", "difficulty");
+CREATE UNIQUE INDEX IF NOT EXISTS "Game_shareCode_key" ON "Game"("shareCode");
