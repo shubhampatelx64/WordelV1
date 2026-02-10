@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CREATOR
+  USER
+}
+
+enum GameMode {
+  DAILY
+  CUSTOM
+  PRACTICE
+}
+
+enum GamePlayStatus {
+  IN_PROGRESS
+  WIN
+  LOSS
+}
+
+enum DictionaryMode {
+  STRICT
+  RELAXED
+}
+
+enum HintType {
+  DEFINITION
+  CATEGORY
+  SYNONYM
+  RIDDLE
+  FIRST_LETTER
+}
+
+enum LeaderboardScope {
+  DAILY
+  CUSTOM
+  PRACTICE
+}
+
+model User {
+  id            String             @id @default(cuid())
+  email         String             @unique
+  passwordHash  String
+  displayName   String
+  role          Role               @default(USER)
+  bannedAt      DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  gamePlays     GamePlay[]
+  leaderboard   LeaderboardEntry[]
+  createdGames  Game[]             @relation("CreatedGames")
+  auditLogs     AuditLog[]
+}
+
+model Word {
+  id         String   @id @default(cuid())
+  text       String   @unique
+  length     Int
+  difficulty String
+  tags       String[] @default([])
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  hints      Hint[]
+  games      Game[]   @relation("AnswerWord")
+}
+
+model Hint {
+  id        String   @id @default(cuid())
+  wordId     String
+  type      HintType
+  content   String
+  cost      Int
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  word      Word     @relation(fields: [wordId], references: [id])
+  uses      HintUse[]
+
+  @@unique([wordId, order])
+}
+
+model Game {
+  id              String         @id @default(cuid())
+  mode            GameMode
+  length          Int
+  maxAttempts     Int
+  hardModeAllowed Boolean        @default(true)
+  allowReplay     Boolean        @default(false)
+  dateKey         String?
+  answerWordId    String
+  creatorUserId   String?
+  shareCode       String?        @unique
+  startAt         DateTime?
+  endAt           DateTime?
+  dictionaryMode  DictionaryMode @default(STRICT)
+  difficulty      String         @default("medium")
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  answerWord      Word           @relation("AnswerWord", fields: [answerWordId], references: [id])
+  creatorUser     User?          @relation("CreatedGames", fields: [creatorUserId], references: [id])
+  gamePlays       GamePlay[]
+  leaderboard     LeaderboardEntry[]
+
+  @@unique([mode, dateKey, length, difficulty])
+  @@index([dateKey, length, difficulty])
+  @@index([shareCode])
+}
+
+model GamePlay {
+  id           String         @id @default(cuid())
+  gameId        String
+  userId        String
+  startedAt     DateTime       @default(now())
+  completedAt   DateTime?
+  status        GamePlayStatus @default(IN_PROGRESS)
+  attemptsUsed  Int            @default(0)
+  timeMs        Int            @default(0)
+  hintPenalty   Int            @default(0)
+  hintsUsed     Int            @default(0)
+  score         Int            @default(0)
+  hardMode      Boolean        @default(false)
+  game          Game           @relation(fields: [gameId], references: [id])
+  user          User           @relation(fields: [userId], references: [id])
+  guesses       Guess[]
+  hintUses      HintUse[]
+
+  @@unique([gameId, userId])
+}
+
+model Guess {
+  id            String   @id @default(cuid())
+  gamePlayId    String
+  guessText     String
+  resultPattern String
+  createdAt     DateTime @default(now())
+  gamePlay      GamePlay @relation(fields: [gamePlayId], references: [id])
+
+  @@index([gamePlayId, createdAt])
+}
+
+model HintUse {
+  id         String   @id @default(cuid())
+  gamePlayId String
+  hintId     String
+  usedAt     DateTime @default(now())
+  gamePlay   GamePlay @relation(fields: [gamePlayId], references: [id])
+  hint       Hint     @relation(fields: [hintId], references: [id])
+
+  @@unique([gamePlayId, hintId])
+}
+
+model LeaderboardEntry {
+  id           String           @id @default(cuid())
+  dateKey      String?
+  gameId       String
+  userId       String
+  scope        LeaderboardScope
+  scopeKey     String
+  score        Int
+  attemptsUsed Int
+  timeMs       Int
+  hintPenalty  Int              @default(0)
+  createdAt    DateTime         @default(now())
+  game         Game             @relation(fields: [gameId], references: [id])
+  user         User             @relation(fields: [userId], references: [id])
+
+  @@unique([gameId, userId])
+  @@index([scope, scopeKey, score(sort: Desc)])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String
+  action      String
+  targetType  String
+  targetId    String?
+  metadata    Json
+  createdAt   DateTime @default(now())
+  actor       User     @relation(fields: [actorUserId], references: [id])
+
+  @@index([createdAt])
+  @@index([action, targetType])
+}
