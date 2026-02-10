@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum GameMode {
+  DAILY
+}
+
+enum GamePlayStatus {
+  IN_PROGRESS
+  WIN
+  LOSS
+}
+
+model User {
+  id            String             @id @default(cuid())
+  email         String             @unique
+  passwordHash  String
+  displayName   String
+  role          Role               @default(USER)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  gamePlays     GamePlay[]
+  leaderboard   LeaderboardEntry[]
+}
+
+model Word {
+  id         String   @id @default(cuid())
+  text       String   @unique
+  length     Int
+  difficulty String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  games      Game[]
+}
+
+model Game {
+  id              String      @id @default(cuid())
+  mode            GameMode
+  length          Int
+  maxAttempts     Int
+  hardModeAllowed Boolean     @default(true)
+  dateKey         String
+  answerWordId    String
+  isActive        Boolean     @default(true)
+  answerWord      Word        @relation(fields: [answerWordId], references: [id])
+  gamePlays       GamePlay[]
+  leaderboard     LeaderboardEntry[]
+
+  @@unique([mode, dateKey, length])
+  @@index([dateKey, mode])
+}
+
+model GamePlay {
+  id           String         @id @default(cuid())
+  gameId        String
+  userId        String
+  startedAt     DateTime       @default(now())
+  completedAt   DateTime?
+  status        GamePlayStatus @default(IN_PROGRESS)
+  attemptsUsed  Int            @default(0)
+  timeMs        Int            @default(0)
+  score         Int            @default(0)
+  hardMode      Boolean        @default(false)
+  game          Game           @relation(fields: [gameId], references: [id])
+  user          User           @relation(fields: [userId], references: [id])
+  guesses       Guess[]
+
+  @@unique([gameId, userId])
+}
+
+model Guess {
+  id           String   @id @default(cuid())
+  gamePlayId   String
+  guessText    String
+  resultPattern String
+  createdAt    DateTime @default(now())
+  gamePlay     GamePlay @relation(fields: [gamePlayId], references: [id])
+
+  @@index([gamePlayId, createdAt])
+}
+
+model LeaderboardEntry {
+  id           String   @id @default(cuid())
+  dateKey      String
+  gameId       String
+  userId       String
+  score        Int
+  attemptsUsed Int
+  timeMs       Int
+  createdAt    DateTime @default(now())
+  game         Game     @relation(fields: [gameId], references: [id])
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@unique([gameId, userId])
+  @@index([dateKey, gameId, score(sort: Desc)])
+}
