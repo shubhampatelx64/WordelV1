@@ -1,20 +1,21 @@
 import './globals.css';
-import Link from 'next/link';
 import { ReactNode } from 'react';
+import { Providers } from '@/components/Providers';
+import { NavBar } from '@/components/NavBar';
+
+export const metadata = {
+  title: 'Wordel - Daily Word Guessing Game',
+  description: 'Play Wordel - guess the hidden word in 6 tries. A daily word game with hints, hard mode, and leaderboards.'
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <nav className="p-4 bg-white shadow flex gap-4">
-          <Link href="/daily">Daily</Link>
-          <Link href="/leaderboard">Leaderboard</Link>
-          <Link href="/profile">Profile</Link>
-          <Link href="/login">Login</Link>
-          <Link href="/signup">Sign Up</Link>
-          <Link href="/admin">Admin</Link>
-        </nav>
-        <main className="max-w-3xl mx-auto p-4">{children}</main>
+        <Providers>
+          <NavBar />
+          <main className="max-w-3xl mx-auto p-4">{children}</main>
+        </Providers>
       </body>
     </html>
   );
