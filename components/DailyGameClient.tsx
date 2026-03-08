@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 
 type GuessRow = { guessText: string; resultPattern: string };
 type LetterState = 'correct' | 'present' | 'absent' | 'unused';
@@ -52,6 +52,30 @@ const KEYBOARD_ROWS = [
   ['ENTER', ...'ZXCVBNM'.split(''), 'BACKSPACE'],
 ];
 
+// Stats stored per-user in localStorage
+interface GameStats {
+  gamesPlayed: number;
+  gamesWon: number;
+  currentStreak: number;
+  maxStreak: number;
+  guessDistribution: Record<number, number>; // attempts -> count
+  lastGameDate: string;
+}
+
+function getStats(): GameStats {
+  try {
+    const raw = localStorage.getItem('wordel-stats');
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { gamesPlayed: 0, gamesWon: 0, currentStreak: 0, maxStreak: 0, guessDistribution: {}, lastGameDate: '' };
+}
+
+function saveStats(stats: GameStats) {
+  try {
+    localStorage.setItem('wordel-stats', JSON.stringify(stats));
+  } catch {}
+}
+
 interface Props {
   shareCode?: string;
   /** Pass gameId directly to skip the game-fetch step (used by practice mode) */
@@ -68,11 +92,41 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
   const [status, setStatus] = useState<string>('IN_PROGRESS');
   const [input, setInput] = useState('');
   const [hardMode, setHardMode] = useState(false);
-  const [message, setMessage] = useState('');
   const [hints, setHints] = useState<any[]>([]);
   const [loading, setLoading] = useState(!externalGameId);
   const [submitting, setSubmitting] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
+  const [answer, setAnswer] = useState<string>('');
+
+  // Toast messages
+  const [toasts, setToasts] = useState<{ id: number; text: string; exiting: boolean }[]>([]);
+  const toastIdRef = useRef(0);
+
+  // Animation state
+  const [shakeRow, setShakeRow] = useState(-1);
+  const [revealingRow, setRevealingRow] = useState(-1); // row index currently flipping
+  const [bounceRow, setBounceRow] = useState(-1);
+  const [poppedTile, setPoppedTile] = useState<string>(''); // "row-col" key
+
+  // Stats modal
+  const [showStats, setShowStats] = useState(false);
+  const [stats, setStats] = useState<GameStats>(getStats);
+
+  // Track previously submitted guesses to prevent duplicate counting
+  const prevGuessCountRef = useRef(0);
+
+  const showToast = useCallback((text: string, duration = 2000) => {
+    const id = ++toastIdRef.current;
+    setToasts((prev) => [...prev, { id, text, exiting: false }]);
+    if (duration > 0) {
+      setTimeout(() => {
+        setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
+        setTimeout(() => {
+          setToasts((prev) => prev.filter((t) => t.id !== id));
+        }, 300);
+      }, duration);
+    }
+  }, []);
 
   // Step 1: Fetch the game (unless gameId provided directly)
   useEffect(() => {
@@ -82,7 +136,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       const url = shareCode ? `/api/g/${shareCode}` : '/api/daily';
       const res = await fetch(url).then((r) => r.json());
       if (!res.ok) {
-        setMessage(res.error?.message ?? 'Failed to load game.');
+        showToast(res.error?.message ?? 'Failed to load game.', 5000);
         setLoading(false);
         return;
       }
@@ -92,7 +146,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       setDifficulty(res.data.difficulty ?? '');
       setLoading(false);
     })();
-  }, [shareCode, externalGameId]);
+  }, [shareCode, externalGameId, showToast]);
 
   // Step 2: Start the game once we have a gameId
   useEffect(() => {
@@ -106,11 +160,11 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       const json = await res.json();
       if (!json.ok) {
         if (json.error?.code === 'UNAUTHORIZED') {
-          setMessage('Please log in to play.');
+          showToast('Please log in to play.', 0);
         } else if (json.error?.code === 'REPLAY_FORBIDDEN') {
-          setMessage('You already completed this game.');
+          showToast('You already completed this game.', 0);
         } else {
-          setMessage(json.error?.message ?? 'Failed to start game.');
+          showToast(json.error?.message ?? 'Failed to start game.', 5000);
         }
         return;
       }
@@ -118,12 +172,15 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       // Fetch current game state (for resumed games)
       const state = await fetch(`/api/games/${gameId}/state`).then((r) => r.json());
       if (state.ok) {
-        setGuesses(state.data.guesses ?? []);
+        const loadedGuesses = state.data.guesses ?? [];
+        setGuesses(loadedGuesses);
+        prevGuessCountRef.current = loadedGuesses.length;
         setStatus(state.data.status ?? 'IN_PROGRESS');
         if (state.data.hints?.length) setHints(state.data.hints);
+        if (state.data.answer) setAnswer(state.data.answer);
       }
     })();
-  }, [gameId, gameStarted, hardMode]);
+  }, [gameId, gameStarted, hardMode, showToast]);
 
   // Keyboard letter states derived from submitted guesses
   const letterStates = useMemo<Record<string, LetterState>>(() => {
@@ -168,42 +225,104 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
     if (!gameId || submitting || status !== 'IN_PROGRESS') return;
     const word = input.trim();
     if (word.length !== gameLength) {
-      setMessage(`Word must be ${gameLength} letters`);
+      showToast('Not enough letters');
+      // Shake the current input row
+      setShakeRow(guesses.length);
+      setTimeout(() => setShakeRow(-1), 400);
       return;
     }
     setSubmitting(true);
-    setMessage('');
     const res = await fetch(`/api/games/${gameId}/guess`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ guessText: word }),
     });
     const json = await res.json();
-    setSubmitting(false);
     if (!json.ok) {
-      setMessage(json.error?.message ?? 'Error submitting guess');
+      setSubmitting(false);
+      const msg = json.error?.message ?? 'Error submitting guess';
+      showToast(msg);
+      // Shake row for invalid word
+      setShakeRow(guesses.length);
+      setTimeout(() => setShakeRow(-1), 400);
       return;
     }
-    const state = await fetch(`/api/games/${gameId}/state`).then((r) => r.json());
-    if (state.ok) {
-      setGuesses(state.data.guesses ?? []);
-      setStatus(state.data.status ?? 'IN_PROGRESS');
-    }
+
+    // Trigger flip animation for the current row
+    const currentRow = guesses.length;
+    setRevealingRow(currentRow);
+
+    // Wait for flip animation to complete before updating state
+    const flipDuration = gameLength * 100 + 500; // stagger + animation time
+    setTimeout(async () => {
+      const state = await fetch(`/api/games/${gameId}/state`).then((r) => r.json());
+      if (state.ok) {
+        const newGuesses = state.data.guesses ?? [];
+        setGuesses(newGuesses);
+        setStatus(state.data.status ?? 'IN_PROGRESS');
+        if (state.data.answer) setAnswer(state.data.answer);
+
+        // Update stats on game completion
+        if (state.data.status === 'WIN' || state.data.status === 'LOSS') {
+          const currentStats = getStats();
+          const today = new Date().toISOString().split('T')[0];
+
+          // Only update if this game hasn't been counted yet
+          if (currentStats.lastGameDate !== today || !shareCode) {
+            currentStats.gamesPlayed += 1;
+            if (state.data.status === 'WIN') {
+              currentStats.gamesWon += 1;
+              currentStats.currentStreak += 1;
+              currentStats.maxStreak = Math.max(currentStats.maxStreak, currentStats.currentStreak);
+              const attempts = newGuesses.length;
+              currentStats.guessDistribution[attempts] = (currentStats.guessDistribution[attempts] ?? 0) + 1;
+            } else {
+              currentStats.currentStreak = 0;
+            }
+            currentStats.lastGameDate = today;
+            saveStats(currentStats);
+            setStats(currentStats);
+          }
+
+          // Show win bounce or loss message
+          if (state.data.status === 'WIN') {
+            setBounceRow(newGuesses.length - 1);
+            setTimeout(() => setBounceRow(-1), 1500);
+            const winMessages = ['Genius!', 'Magnificent!', 'Impressive!', 'Splendid!', 'Great!', 'Phew!'];
+            const msgIndex = Math.min(newGuesses.length - 1, winMessages.length - 1);
+            showToast(winMessages[msgIndex], 3000);
+          } else {
+            showToast(state.data.answer ?? 'Better luck next time!', 5000);
+          }
+
+          // Show stats modal after a delay
+          setTimeout(() => setShowStats(true), state.data.status === 'WIN' ? 2500 : 3000);
+        }
+      }
+      setRevealingRow(-1);
+      setSubmitting(false);
+    }, flipDuration);
+
     setInput('');
-  }, [gameId, input, gameLength, status, submitting]);
+  }, [gameId, input, gameLength, status, submitting, guesses.length, showToast, shareCode]);
 
   const handleKey = useCallback(
     (key: string) => {
-      if (status !== 'IN_PROGRESS') return;
+      if (status !== 'IN_PROGRESS' || submitting) return;
       if (key === 'ENTER') {
         submitGuess();
       } else if (key === 'BACKSPACE') {
         setInput((v) => v.slice(0, -1));
       } else if (/^[A-Z]$/.test(key) && input.length < gameLength) {
+        const newLen = input.length;
         setInput((v) => v + key);
+        // Trigger pop animation on the tile
+        const tileKey = `${guesses.length}-${newLen}`;
+        setPoppedTile(tileKey);
+        setTimeout(() => setPoppedTile(''), 100);
       }
     },
-    [status, input, gameLength, submitGuess]
+    [status, input, gameLength, submitGuess, submitting, guesses.length]
   );
 
   // Physical keyboard support
@@ -223,11 +342,10 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
     const res = await fetch(`/api/games/${gameId}/hint`, { method: 'POST' });
     const json = await res.json();
     if (!json.ok) {
-      setMessage(json.error?.message ?? 'No hints available');
+      showToast(json.error?.message ?? 'No hints available');
       return;
     }
     setHints((prev) => [...prev, json.data.hint]);
-    setMessage('');
   };
 
   if (loading) {
@@ -240,8 +358,24 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
 
   const tileSize = gameLength <= 5 ? 'w-14 h-14' : gameLength <= 7 ? 'w-11 h-11' : 'w-9 h-9';
 
+  const maxDist = Math.max(1, ...Object.values(stats.guessDistribution));
+
   return (
     <div className="flex flex-col items-center gap-5">
+      {/* Toast container */}
+      <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`bg-gray-900 text-white px-5 py-3 rounded-lg font-bold text-sm shadow-lg pointer-events-auto ${
+              t.exiting ? 'toast-exit' : 'toast-enter'
+            }`}
+          >
+            {t.text}
+          </div>
+        ))}
+      </div>
+
       {/* Game meta */}
       {(difficulty || gameLength) && (
         <div className="flex items-center gap-4 text-xs text-gray-500">
@@ -257,26 +391,6 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
             />
             Hard mode
           </label>
-        </div>
-      )}
-
-      {/* Messages */}
-      {message && (
-        <div
-          className={`px-4 py-2 rounded text-sm font-medium ${
-            message.includes('log in') || message.includes('Log in') || message.includes('login')
-              ? 'bg-blue-100 text-blue-800'
-              : message.includes('Copied')
-              ? 'bg-green-100 text-green-800'
-              : 'bg-red-100 text-red-800'
-          }`}
-        >
-          {message}
-          {(message.includes('log in') || message.includes('login')) && (
-            <a href="/login" className="ml-2 underline font-bold">
-              Log in
-            </a>
-          )}
         </div>
       )}
 
@@ -296,13 +410,29 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       {/* Game board */}
       <div className="grid gap-1.5">
         {rows.map((row, ri) => (
-          <div key={ri} className="flex gap-1.5">
+          <div
+            key={ri}
+            className={`flex gap-1.5 ${shakeRow === ri ? 'row-shake' : ''}`}
+          >
             {Array.from({ length: gameLength }).map((_, ci) => {
               const ch = row.guessText[ci]?.trim() ? row.guessText[ci] : '';
               const pattern = row.resultPattern[ci] ?? 'B';
               const state = getTileState(ch, pattern, row.isSubmitted);
+              const tileKey = `${ri}-${ci}`;
+              const isRevealing = revealingRow === ri && row.isSubmitted;
+              const isBouncing = bounceRow === ri;
+              const isPopping = poppedTile === tileKey;
+
+              let animClass = '';
+              if (isRevealing) animClass = `tile-flip tile-delay-${ci}`;
+              else if (isBouncing) animClass = `tile-bounce bounce-delay-${ci}`;
+              else if (isPopping) animClass = 'tile-pop';
+
               return (
-                <div key={ci} className={`${tileClass(state)} ${tileSize}`}>
+                <div
+                  key={ci}
+                  className={`${tileClass(state)} ${tileSize} ${animClass}`}
+                >
                   {ch}
                 </div>
               );
@@ -323,31 +453,45 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       {status === 'LOSS' && (
         <div className="text-center space-y-1">
           <p className="text-2xl font-bold text-red-600">Game over</p>
-          <p className="text-gray-500 text-sm">Better luck next time!</p>
+          {answer && (
+            <p className="text-gray-700 text-sm">
+              The word was <span className="font-bold uppercase tracking-wider">{answer}</span>
+            </p>
+          )}
         </div>
       )}
 
-      {/* Share + Hint buttons */}
+      {/* Share + Hint + Stats buttons */}
       <div className="flex gap-3">
         {status !== 'IN_PROGRESS' && (
-          <button
-            className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg font-semibold text-sm transition-colors"
-            onClick={async () => {
-              const header = `Wordel ${guesses.length}/${maxAttempts}`;
-              const grid = guesses
-                .map((g) =>
-                  g.resultPattern
-                    .replace(/G/g, '\u{1F7E9}')
-                    .replace(/Y/g, '\u{1F7E8}')
-                    .replace(/B/g, '\u2B1B')
-                )
-                .join('\n');
-              await navigator.clipboard.writeText(`${header}\n\n${grid}`);
-              setMessage('Copied to clipboard!');
-            }}
-          >
-            Share result
-          </button>
+          <>
+            <button
+              className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg font-semibold text-sm transition-colors"
+              onClick={async () => {
+                const header = status === 'WIN'
+                  ? `Wordel ${guesses.length}/${maxAttempts}`
+                  : `Wordel X/${maxAttempts}`;
+                const grid = guesses
+                  .map((g) =>
+                    g.resultPattern
+                      .replace(/G/g, '\u{1F7E9}')
+                      .replace(/Y/g, '\u{1F7E8}')
+                      .replace(/B/g, '\u2B1B')
+                  )
+                  .join('\n');
+                await navigator.clipboard.writeText(`${header}\n\n${grid}`);
+                showToast('Copied to clipboard!');
+              }}
+            >
+              Share result
+            </button>
+            <button
+              className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-2 rounded-lg font-semibold text-sm transition-colors"
+              onClick={() => setShowStats(true)}
+            >
+              Statistics
+            </button>
+          </>
         )}
         {status === 'IN_PROGRESS' && gameStarted && (
           <button
@@ -375,6 +519,71 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
           </div>
         ))}
       </div>
+
+      {/* Statistics Modal */}
+      {showStats && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowStats(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 modal-enter"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold tracking-wide uppercase">Statistics</h2>
+              <button
+                onClick={() => setShowStats(false)}
+                className="text-gray-400 hover:text-gray-700 text-xl font-bold leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Summary stats */}
+            <div className="grid grid-cols-4 gap-2 mb-6">
+              {[
+                { value: stats.gamesPlayed, label: 'Played' },
+                { value: stats.gamesPlayed > 0 ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0, label: 'Win %' },
+                { value: stats.currentStreak, label: 'Current Streak' },
+                { value: stats.maxStreak, label: 'Max Streak' },
+              ].map(({ value, label }) => (
+                <div key={label} className="text-center">
+                  <p className="text-2xl font-bold">{value}</p>
+                  <p className="text-xs text-gray-500 leading-tight">{label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Guess distribution */}
+            <h3 className="text-sm font-bold uppercase tracking-wide mb-3">Guess Distribution</h3>
+            {stats.gamesPlayed === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No data yet</p>
+            ) : (
+              <div className="space-y-1">
+                {Array.from({ length: maxAttempts }).map((_, i) => {
+                  const count = stats.guessDistribution[i + 1] ?? 0;
+                  const width = Math.max(8, (count / maxDist) * 100);
+                  const isLastGuess = status === 'WIN' && guesses.length === i + 1;
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-sm font-bold w-3 text-right">{i + 1}</span>
+                      <div
+                        className={`h-5 flex items-center justify-end px-1.5 text-xs font-bold text-white rounded-sm ${
+                          isLastGuess ? 'bg-green-600' : 'bg-gray-500'
+                        }`}
+                        style={{ width: `${width}%` }}
+                      >
+                        {count}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Hidden status for tests */}
       <p data-testid="status" className="sr-only">
