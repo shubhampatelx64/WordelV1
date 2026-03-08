@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, Suspense } from 'react';
 
@@ -51,19 +50,27 @@ interface UserRecord {
 // ─── Reusable UI ───
 function Badge({ color, children }: { color: string; children: React.ReactNode }) {
   const colors: Record<string, string> = {
-    green: 'bg-green-100 text-green-800',
-    red: 'bg-red-100 text-red-800',
-    blue: 'bg-blue-100 text-blue-800',
-    gray: 'bg-gray-100 text-gray-800',
-    yellow: 'bg-yellow-100 text-yellow-800',
-    purple: 'bg-purple-100 text-purple-800',
+    green: 'bg-green-900/50 text-green-400',
+    red: 'bg-red-900/50 text-red-400',
+    blue: 'bg-blue-900/50 text-blue-400',
+    gray: 'bg-gray-800 text-gray-400',
+    yellow: 'bg-yellow-900/50 text-yellow-400',
+    purple: 'bg-purple-900/50 text-purple-400',
   };
   return <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${colors[color] ?? colors.gray}`}>{children}</span>;
 }
 
 function StatusMessage({ message, type }: { message: string; type: 'success' | 'error' | 'info' }) {
-  const cls = type === 'success' ? 'bg-green-50 text-green-800 border-green-200' : type === 'error' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-blue-50 text-blue-800 border-blue-200';
-  return <div className={`px-4 py-2 rounded border text-sm ${cls}`}>{message}</div>;
+  const cls = type === 'success' ? 'bg-green-900/30 text-green-400 border-green-800' : type === 'error' ? 'bg-red-900/30 text-red-400 border-red-800' : 'bg-blue-900/30 text-blue-400 border-blue-800';
+  return <div className={`px-4 py-2 rounded-lg border text-sm ${cls}`}>{message}</div>;
+}
+
+function inputClass() {
+  return 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-correct focus:border-transparent w-full transition-all';
+}
+
+function selectClass() {
+  return 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-correct focus:border-transparent w-full transition-all';
 }
 
 // ─── Words Tab ───
@@ -74,13 +81,11 @@ function WordsTab() {
   const [showForm, setShowForm] = useState(false);
   const [editingWord, setEditingWord] = useState<WordRecord | null>(null);
 
-  // Form state
   const [formText, setFormText] = useState('');
   const [formDifficulty, setFormDifficulty] = useState('medium');
   const [formTags, setFormTags] = useState('');
   const [formHints, setFormHints] = useState<HintRecord[]>([]);
 
-  // Import state
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
 
@@ -95,20 +100,13 @@ function WordsTab() {
   useEffect(() => { fetchWords(); }, [fetchWords]);
 
   function resetForm() {
-    setFormText('');
-    setFormDifficulty('medium');
-    setFormTags('');
-    setFormHints([]);
-    setEditingWord(null);
-    setShowForm(false);
+    setFormText(''); setFormDifficulty('medium'); setFormTags(''); setFormHints([]);
+    setEditingWord(null); setShowForm(false);
   }
 
   function startEdit(w: WordRecord) {
-    setEditingWord(w);
-    setFormText(w.text);
-    setFormDifficulty(w.difficulty);
-    setFormTags(w.tags.join(', '));
-    setFormHints(w.hints.map(h => ({ type: h.type, content: h.content, cost: h.cost, order: h.order })));
+    setEditingWord(w); setFormText(w.text); setFormDifficulty(w.difficulty);
+    setFormTags(w.tags.join(', ')); setFormHints(w.hints.map(h => ({ type: h.type, content: h.content, cost: h.cost, order: h.order })));
     setShowForm(true);
   }
 
@@ -124,16 +122,14 @@ function WordsTab() {
 
     if (editingWord) {
       const res = await fetch('/api/admin/words', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: editingWord.id, text, length: text.length, difficulty: formDifficulty, tags, hints: formHints }),
       }).then(r => r.json());
       if (res.ok) { setMsg({ text: 'Word updated', type: 'success' }); resetForm(); fetchWords(); }
       else setMsg({ text: res.error?.message ?? 'Update failed', type: 'error' });
     } else {
       const res = await fetch('/api/admin/words', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, length: text.length, difficulty: formDifficulty, tags, hints: formHints }),
       }).then(r => r.json());
       if (res.ok) { setMsg({ text: 'Word created', type: 'success' }); resetForm(); fetchWords(); }
@@ -156,15 +152,12 @@ function WordsTab() {
       return { text: parts[0].toUpperCase(), difficulty: parts[1] || 'medium', tags: parts.slice(2) };
     });
     const res = await fetch('/api/admin/words/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rows }),
     }).then(r => r.json());
     if (res.ok) {
       setMsg({ text: `Imported ${res.data.inserted.length} words, ${res.data.errors.length} errors`, type: 'success' });
-      setImportText('');
-      setShowImport(false);
-      fetchWords();
+      setImportText(''); setShowImport(false); fetchWords();
     } else {
       setMsg({ text: res.error?.message ?? 'Import failed', type: 'error' });
     }
@@ -175,150 +168,99 @@ function WordsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">Words ({words.length})</h2>
+        <h2 className="text-lg font-bold text-white">Words ({words.length})</h2>
         <div className="flex gap-2">
-          <button onClick={() => setShowImport(!showImport)} className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-            Import CSV
-          </button>
-          <button onClick={() => { resetForm(); setShowForm(!showForm); }} className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
-            + Add Word
-          </button>
+          <button onClick={() => setShowImport(!showImport)} className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-all active:scale-95">Import CSV</button>
+          <button onClick={() => { resetForm(); setShowForm(!showForm); }} className="px-3 py-1.5 text-sm bg-correct text-white rounded-lg hover:bg-green-600 transition-all active:scale-95">+ Add Word</button>
         </div>
       </div>
 
       {msg && <StatusMessage message={msg.text} type={msg.type} />}
 
-      {/* Import panel */}
       {showImport && (
-        <div className="bg-blue-50 border border-blue-200 rounded p-4 space-y-3">
-          <p className="text-sm text-blue-800 font-medium">Paste words (one per line): WORD,difficulty,tag1,tag2</p>
-          <textarea
-            value={importText}
-            onChange={(e) => setImportText(e.target.value)}
-            rows={5}
-            className="w-full border rounded p-2 text-sm font-mono"
-            placeholder="APPLE,easy,fruit&#10;BRAIN,medium,body&#10;CRANE,hard"
-          />
+        <div className="glass rounded-xl p-4 space-y-3">
+          <p className="text-sm text-gray-300 font-medium">Paste words (one per line): WORD,difficulty,tag1,tag2</p>
+          <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={5} className={`${inputClass()} font-mono`} placeholder={"APPLE,easy,fruit\nBRAIN,medium,body\nCRANE,hard"} />
           <div className="flex gap-2">
-            <button onClick={handleImport} className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Import</button>
-            <button onClick={() => setShowImport(false)} className="px-4 py-1.5 text-sm bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
+            <button onClick={handleImport} className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500">Import</button>
+            <button onClick={() => setShowImport(false)} className="px-4 py-1.5 text-sm bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600">Cancel</button>
           </div>
         </div>
       )}
 
-      {/* Add/Edit form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-gray-50 border rounded p-4 space-y-3">
-          <h3 className="font-semibold text-sm">{editingWord ? 'Edit Word' : 'New Word'}</h3>
+        <form onSubmit={handleSubmit} className="glass rounded-xl p-4 space-y-3">
+          <h3 className="font-bold text-sm text-white">{editingWord ? 'Edit Word' : 'New Word'}</h3>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Word</label>
-              <input
-                value={formText}
-                onChange={(e) => setFormText(e.target.value.toUpperCase())}
-                className="w-full border rounded px-2 py-1.5 text-sm font-mono uppercase"
-                required
-                pattern="[A-Za-z]{4,10}"
-                placeholder="APPLE"
-              />
+              <label className="block text-xs font-medium text-gray-400 mb-1">Word</label>
+              <input value={formText} onChange={(e) => setFormText(e.target.value.toUpperCase())} className={`${inputClass()} font-mono uppercase`} required pattern="[A-Za-z]{4,10}" placeholder="APPLE" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Difficulty</label>
-              <select value={formDifficulty} onChange={(e) => setFormDifficulty(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm">
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Difficulty</label>
+              <select value={formDifficulty} onChange={(e) => setFormDifficulty(e.target.value)} className={selectClass()}>
+                <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Tags (comma-sep)</label>
-              <input value={formTags} onChange={(e) => setFormTags(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm" placeholder="fruit, food" />
+              <label className="block text-xs font-medium text-gray-400 mb-1">Tags (comma-sep)</label>
+              <input value={formTags} onChange={(e) => setFormTags(e.target.value)} className={inputClass()} placeholder="fruit, food" />
             </div>
           </div>
-
-          {/* Hints */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-gray-600">Hints (max 3)</label>
-              {formHints.length < 3 && (
-                <button type="button" onClick={addHint} className="text-xs text-blue-600 hover:text-blue-800">+ Add hint</button>
-              )}
+              <label className="text-xs font-medium text-gray-400">Hints (max 3)</label>
+              {formHints.length < 3 && <button type="button" onClick={addHint} className="text-xs text-correct hover:text-green-400">+ Add hint</button>}
             </div>
             {formHints.map((h, i) => (
               <div key={i} className="flex gap-2 items-start">
-                <select
-                  value={h.type}
-                  onChange={(e) => setFormHints(prev => prev.map((hh, j) => j === i ? { ...hh, type: e.target.value } : hh))}
-                  className="border rounded px-2 py-1 text-xs w-32"
-                >
+                <select value={h.type} onChange={(e) => setFormHints(prev => prev.map((hh, j) => j === i ? { ...hh, type: e.target.value } : hh))} className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-xs text-white w-32">
                   {['DEFINITION', 'CATEGORY', 'SYNONYM', 'RIDDLE', 'FIRST_LETTER'].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
-                <input
-                  value={h.content}
-                  onChange={(e) => setFormHints(prev => prev.map((hh, j) => j === i ? { ...hh, content: e.target.value } : hh))}
-                  className="flex-1 border rounded px-2 py-1 text-xs"
-                  placeholder="Hint text..."
-                  required
-                />
-                <input
-                  type="number"
-                  value={h.cost}
-                  onChange={(e) => setFormHints(prev => prev.map((hh, j) => j === i ? { ...hh, cost: Number(e.target.value) } : hh))}
-                  className="border rounded px-2 py-1 text-xs w-16"
-                  min={0}
-                />
-                <button
-                  type="button"
-                  onClick={() => setFormHints(prev => prev.filter((_, j) => j !== i).map((hh, j) => ({ ...hh, order: j + 1 })))}
-                  className="text-red-500 hover:text-red-700 text-sm"
-                >
-                  &times;
-                </button>
+                <input value={h.content} onChange={(e) => setFormHints(prev => prev.map((hh, j) => j === i ? { ...hh, content: e.target.value } : hh))} className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-xs text-white" placeholder="Hint text..." required />
+                <input type="number" value={h.cost} onChange={(e) => setFormHints(prev => prev.map((hh, j) => j === i ? { ...hh, cost: Number(e.target.value) } : hh))} className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-xs text-white w-16" min={0} />
+                <button type="button" onClick={() => setFormHints(prev => prev.filter((_, j) => j !== i).map((hh, j) => ({ ...hh, order: j + 1 })))} className="text-red-400 hover:text-red-300 text-sm">&times;</button>
               </div>
             ))}
           </div>
-
           <div className="flex gap-2">
-            <button type="submit" className="px-4 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700">
-              {editingWord ? 'Update' : 'Create'}
-            </button>
-            <button type="button" onClick={resetForm} className="px-4 py-1.5 text-sm bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
+            <button type="submit" className="px-4 py-1.5 text-sm bg-correct text-white rounded-lg hover:bg-green-600">{editingWord ? 'Update' : 'Create'}</button>
+            <button type="button" onClick={resetForm} className="px-4 py-1.5 text-sm bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600">Cancel</button>
           </div>
         </form>
       )}
 
-      {/* Words table */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto glass rounded-xl">
         <table className="w-full text-sm">
-          <thead className="bg-gray-100">
+          <thead className="border-b border-gray-800">
             <tr>
-              <th className="text-left px-3 py-2 font-medium">Word</th>
-              <th className="text-left px-3 py-2 font-medium">Length</th>
-              <th className="text-left px-3 py-2 font-medium">Difficulty</th>
-              <th className="text-left px-3 py-2 font-medium">Tags</th>
-              <th className="text-left px-3 py-2 font-medium">Hints</th>
-              <th className="text-left px-3 py-2 font-medium">Status</th>
-              <th className="text-right px-3 py-2 font-medium">Actions</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Word</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Len</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Difficulty</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Tags</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Hints</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Status</th>
+              <th className="text-right px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-gray-800/50">
             {words.map(w => (
-              <tr key={w.id} className="hover:bg-gray-50">
-                <td className="px-3 py-2 font-mono font-bold">{w.text}</td>
-                <td className="px-3 py-2">{w.length}</td>
-                <td className="px-3 py-2"><Badge color={w.difficulty === 'easy' ? 'green' : w.difficulty === 'hard' ? 'red' : 'yellow'}>{w.difficulty}</Badge></td>
-                <td className="px-3 py-2 text-gray-500">{w.tags.join(', ') || '-'}</td>
-                <td className="px-3 py-2">{w.hints.length}</td>
-                <td className="px-3 py-2"><Badge color={w.isActive ? 'green' : 'gray'}>{w.isActive ? 'Active' : 'Inactive'}</Badge></td>
-                <td className="px-3 py-2 text-right space-x-2">
-                  <button onClick={() => startEdit(w)} className="text-blue-600 hover:text-blue-800 text-xs">Edit</button>
-                  <button onClick={() => handleDelete(w.id)} className="text-red-600 hover:text-red-800 text-xs">Delete</button>
+              <tr key={w.id} className="hover:bg-white/5 transition-colors">
+                <td className="px-3 py-2.5 font-mono font-bold text-white">{w.text}</td>
+                <td className="px-3 py-2.5 text-gray-400">{w.length}</td>
+                <td className="px-3 py-2.5"><Badge color={w.difficulty === 'easy' ? 'green' : w.difficulty === 'hard' ? 'red' : 'yellow'}>{w.difficulty}</Badge></td>
+                <td className="px-3 py-2.5 text-gray-500">{w.tags.join(', ') || '-'}</td>
+                <td className="px-3 py-2.5 text-gray-400">{w.hints.length}</td>
+                <td className="px-3 py-2.5"><Badge color={w.isActive ? 'green' : 'gray'}>{w.isActive ? 'Active' : 'Inactive'}</Badge></td>
+                <td className="px-3 py-2.5 text-right space-x-2">
+                  <button onClick={() => startEdit(w)} className="text-blue-400 hover:text-blue-300 text-xs">Edit</button>
+                  <button onClick={() => handleDelete(w.id)} className="text-red-400 hover:text-red-300 text-xs">Delete</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {words.length === 0 && <p className="text-center text-gray-400 py-8">No words yet. Add some above.</p>}
+        {words.length === 0 && <p className="text-center text-gray-600 py-8">No words yet. Add some above.</p>}
       </div>
     </div>
   );
@@ -330,13 +272,11 @@ function ScheduleTab() {
   const [words, setWords] = useState<WordRecord[]>([]);
   const [loadingWords, setLoadingWords] = useState(true);
 
-  // Assign form
   const [assignDate, setAssignDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [assignWordId, setAssignWordId] = useState('');
   const [assignDifficulty, setAssignDifficulty] = useState('medium');
   const [assignLength, setAssignLength] = useState(5);
 
-  // Autofill form
   const [autofillDays, setAutofillDays] = useState(7);
   const [autofillLength, setAutofillLength] = useState(5);
   const [autofillDifficulty, setAutofillDifficulty] = useState('medium');
@@ -351,11 +291,9 @@ function ScheduleTab() {
   }, []);
 
   async function handleAssign(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
+    e.preventDefault(); setMsg(null);
     const res = await fetch('/api/admin/daily/schedule', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'assign', dateKey: assignDate, wordId: assignWordId, length: assignLength, difficulty: assignDifficulty }),
     }).then(r => r.json());
     if (res.ok) setMsg({ text: `Daily game scheduled for ${assignDate}`, type: 'success' });
@@ -363,11 +301,9 @@ function ScheduleTab() {
   }
 
   async function handleAutofill(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
+    e.preventDefault(); setMsg(null);
     const res = await fetch('/api/admin/daily/schedule', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'autofill', days: autofillDays, length: autofillLength, difficulty: autofillDifficulty }),
     }).then(r => r.json());
     if (res.ok) setMsg({ text: `Auto-filled ${res.data.createdCount} days`, type: 'success' });
@@ -378,73 +314,65 @@ function ScheduleTab() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-bold">Daily Schedule</h2>
+      <h2 className="text-lg font-bold text-white">Daily Schedule</h2>
       {msg && <StatusMessage message={msg.text} type={msg.type} />}
 
-      {/* Assign a specific word to a date */}
-      <div className="bg-gray-50 border rounded p-4 space-y-3">
-        <h3 className="font-semibold text-sm">Assign Word to Date</h3>
+      <div className="glass rounded-xl p-4 space-y-3">
+        <h3 className="font-bold text-sm text-white">Assign Word to Date</h3>
         <form onSubmit={handleAssign} className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
-            <input type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm" required />
+            <label className="block text-xs font-medium text-gray-400 mb-1">Date</label>
+            <input type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} className={inputClass()} required />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Word Length</label>
-            <select value={assignLength} onChange={(e) => setAssignLength(Number(e.target.value))} className="w-full border rounded px-2 py-1.5 text-sm">
+            <label className="block text-xs font-medium text-gray-400 mb-1">Word Length</label>
+            <select value={assignLength} onChange={(e) => setAssignLength(Number(e.target.value))} className={selectClass()}>
               {[4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n} letters</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Word</label>
-            {loadingWords ? (
-              <p className="text-xs text-gray-400">Loading words...</p>
-            ) : (
-              <select value={assignWordId} onChange={(e) => setAssignWordId(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm" required>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Word</label>
+            {loadingWords ? <p className="text-xs text-gray-500">Loading...</p> : (
+              <select value={assignWordId} onChange={(e) => setAssignWordId(e.target.value)} className={selectClass()} required>
                 <option value="">Select a word</option>
                 {filteredWords.map(w => <option key={w.id} value={w.id}>{w.text} ({w.difficulty})</option>)}
               </select>
             )}
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Difficulty</label>
-            <select value={assignDifficulty} onChange={(e) => setAssignDifficulty(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm">
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Difficulty</label>
+            <select value={assignDifficulty} onChange={(e) => setAssignDifficulty(e.target.value)} className={selectClass()}>
+              <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
             </select>
           </div>
           <div className="col-span-2">
-            <button type="submit" className="px-4 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700">Assign</button>
+            <button type="submit" className="px-4 py-1.5 text-sm bg-correct text-white rounded-lg hover:bg-green-600 transition-all active:scale-95">Assign</button>
           </div>
         </form>
       </div>
 
-      {/* Autofill */}
-      <div className="bg-gray-50 border rounded p-4 space-y-3">
-        <h3 className="font-semibold text-sm">Auto-fill Schedule</h3>
+      <div className="glass rounded-xl p-4 space-y-3">
+        <h3 className="font-bold text-sm text-white">Auto-fill Schedule</h3>
         <p className="text-xs text-gray-500">Automatically assign random words for the next N days.</p>
         <form onSubmit={handleAutofill} className="grid grid-cols-3 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Days</label>
-            <input type="number" value={autofillDays} onChange={(e) => setAutofillDays(Number(e.target.value))} min={1} max={30} className="w-full border rounded px-2 py-1.5 text-sm" />
+            <label className="block text-xs font-medium text-gray-400 mb-1">Days</label>
+            <input type="number" value={autofillDays} onChange={(e) => setAutofillDays(Number(e.target.value))} min={1} max={30} className={inputClass()} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Word Length</label>
-            <select value={autofillLength} onChange={(e) => setAutofillLength(Number(e.target.value))} className="w-full border rounded px-2 py-1.5 text-sm">
+            <label className="block text-xs font-medium text-gray-400 mb-1">Word Length</label>
+            <select value={autofillLength} onChange={(e) => setAutofillLength(Number(e.target.value))} className={selectClass()}>
               {[4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n} letters</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Difficulty</label>
-            <select value={autofillDifficulty} onChange={(e) => setAutofillDifficulty(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm">
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Difficulty</label>
+            <select value={autofillDifficulty} onChange={(e) => setAutofillDifficulty(e.target.value)} className={selectClass()}>
+              <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
             </select>
           </div>
           <div className="col-span-3">
-            <button type="submit" className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Auto-fill</button>
+            <button type="submit" className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-all active:scale-95">Auto-fill</button>
           </div>
         </form>
       </div>
@@ -460,7 +388,6 @@ function GamesTab() {
   const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [showForm, setShowForm] = useState(false);
 
-  // Form state
   const [formWordId, setFormWordId] = useState('');
   const [formLength, setFormLength] = useState(5);
   const [formMaxAttempts, setFormMaxAttempts] = useState(6);
@@ -483,34 +410,18 @@ function GamesTab() {
   useEffect(() => { fetchGames(); }, [fetchGames]);
 
   async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
+    e.preventDefault(); setMsg(null);
     const res = await fetch('/api/admin/games', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        answerWordId: formWordId,
-        length: formLength,
-        maxAttempts: formMaxAttempts,
-        difficulty: formDifficulty,
-        dictionaryMode: formDictMode,
-        hardModeAllowed: formHardMode,
-        allowReplay: formReplay,
-      }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answerWordId: formWordId, length: formLength, maxAttempts: formMaxAttempts, difficulty: formDifficulty, dictionaryMode: formDictMode, hardModeAllowed: formHardMode, allowReplay: formReplay }),
     }).then(r => r.json());
-    if (res.ok) {
-      setMsg({ text: `Game created! Share code: ${res.data.shareCode}`, type: 'success' });
-      setShowForm(false);
-      fetchGames();
-    } else {
-      setMsg({ text: res.error?.message ?? 'Failed to create game', type: 'error' });
-    }
+    if (res.ok) { setMsg({ text: `Game created! Share code: ${res.data.shareCode}`, type: 'success' }); setShowForm(false); fetchGames(); }
+    else setMsg({ text: res.error?.message ?? 'Failed to create game', type: 'error' });
   }
 
   async function toggleActive(game: GameRecord) {
     const res = await fetch('/api/admin/games', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: game.id, isActive: !game.isActive }),
     }).then(r => r.json());
     if (res.ok) fetchGames();
@@ -524,101 +435,88 @@ function GamesTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">Custom Games ({games.length})</h2>
-        <button onClick={() => setShowForm(!showForm)} className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
-          + Create Game
-        </button>
+        <h2 className="text-lg font-bold text-white">Custom Games ({games.length})</h2>
+        <button onClick={() => setShowForm(!showForm)} className="px-3 py-1.5 text-sm bg-correct text-white rounded-lg hover:bg-green-600 transition-all active:scale-95">+ Create Game</button>
       </div>
 
       {msg && <StatusMessage message={msg.text} type={msg.type} />}
 
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-gray-50 border rounded p-4 space-y-3">
-          <h3 className="font-semibold text-sm">New Custom Game</h3>
+        <form onSubmit={handleCreate} className="glass rounded-xl p-4 space-y-3">
+          <h3 className="font-bold text-sm text-white">New Custom Game</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Word Length</label>
-              <select value={formLength} onChange={(e) => setFormLength(Number(e.target.value))} className="w-full border rounded px-2 py-1.5 text-sm">
+              <label className="block text-xs font-medium text-gray-400 mb-1">Word Length</label>
+              <select value={formLength} onChange={(e) => setFormLength(Number(e.target.value))} className={selectClass()}>
                 {[4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n} letters</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Answer Word</label>
-              <select value={formWordId} onChange={(e) => setFormWordId(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm" required>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Answer Word</label>
+              <select value={formWordId} onChange={(e) => setFormWordId(e.target.value)} className={selectClass()} required>
                 <option value="">Select word</option>
                 {filteredWords.map(w => <option key={w.id} value={w.id}>{w.text}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Max Attempts</label>
-              <input type="number" value={formMaxAttempts} onChange={(e) => setFormMaxAttempts(Number(e.target.value))} min={1} max={12} className="w-full border rounded px-2 py-1.5 text-sm" />
+              <label className="block text-xs font-medium text-gray-400 mb-1">Max Attempts</label>
+              <input type="number" value={formMaxAttempts} onChange={(e) => setFormMaxAttempts(Number(e.target.value))} min={1} max={12} className={inputClass()} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Difficulty</label>
-              <select value={formDifficulty} onChange={(e) => setFormDifficulty(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm">
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Difficulty</label>
+              <select value={formDifficulty} onChange={(e) => setFormDifficulty(e.target.value)} className={selectClass()}>
+                <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Dictionary Mode</label>
-              <select value={formDictMode} onChange={(e) => setFormDictMode(e.target.value as any)} className="w-full border rounded px-2 py-1.5 text-sm">
-                <option value="STRICT">Strict (only dictionary words)</option>
-                <option value="RELAXED">Relaxed (any letters)</option>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Dictionary Mode</label>
+              <select value={formDictMode} onChange={(e) => setFormDictMode(e.target.value as any)} className={selectClass()}>
+                <option value="STRICT">Strict</option><option value="RELAXED">Relaxed</option>
               </select>
             </div>
             <div className="flex items-center gap-4 pt-5">
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input type="checkbox" checked={formHardMode} onChange={(e) => setFormHardMode(e.target.checked)} className="accent-green-600" />
-                Hard mode
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer text-gray-300">
+                <input type="checkbox" checked={formHardMode} onChange={(e) => setFormHardMode(e.target.checked)} className="accent-correct" />Hard mode
               </label>
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input type="checkbox" checked={formReplay} onChange={(e) => setFormReplay(e.target.checked)} className="accent-green-600" />
-                Allow replay
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer text-gray-300">
+                <input type="checkbox" checked={formReplay} onChange={(e) => setFormReplay(e.target.checked)} className="accent-correct" />Replay
               </label>
             </div>
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="px-4 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700">Create Game</button>
-            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-1.5 text-sm bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
+            <button type="submit" className="px-4 py-1.5 text-sm bg-correct text-white rounded-lg hover:bg-green-600">Create Game</button>
+            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-1.5 text-sm bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600">Cancel</button>
           </div>
         </form>
       )}
 
-      {/* Games table */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto glass rounded-xl">
         <table className="w-full text-sm">
-          <thead className="bg-gray-100">
+          <thead className="border-b border-gray-800">
             <tr>
-              <th className="text-left px-3 py-2 font-medium">Share Code</th>
-              <th className="text-left px-3 py-2 font-medium">Length</th>
-              <th className="text-left px-3 py-2 font-medium">Attempts</th>
-              <th className="text-left px-3 py-2 font-medium">Difficulty</th>
-              <th className="text-left px-3 py-2 font-medium">Status</th>
-              <th className="text-left px-3 py-2 font-medium">Created</th>
-              <th className="text-right px-3 py-2 font-medium">Actions</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Code</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Len</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Tries</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Diff</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Status</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Created</th>
+              <th className="text-right px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-gray-800/50">
             {games.map(g => (
-              <tr key={g.id} className="hover:bg-gray-50">
-                <td className="px-3 py-2 font-mono">{g.shareCode ?? '-'}</td>
-                <td className="px-3 py-2">{g.length}</td>
-                <td className="px-3 py-2">{g.maxAttempts}</td>
-                <td className="px-3 py-2"><Badge color={g.difficulty === 'easy' ? 'green' : g.difficulty === 'hard' ? 'red' : 'yellow'}>{g.difficulty}</Badge></td>
-                <td className="px-3 py-2"><Badge color={g.isActive ? 'green' : 'gray'}>{g.isActive ? 'Active' : 'Inactive'}</Badge></td>
-                <td className="px-3 py-2 text-gray-500">{new Date(g.createdAt).toLocaleDateString()}</td>
-                <td className="px-3 py-2 text-right space-x-2">
+              <tr key={g.id} className="hover:bg-white/5 transition-colors">
+                <td className="px-3 py-2.5 font-mono text-white">{g.shareCode ?? '-'}</td>
+                <td className="px-3 py-2.5 text-gray-400">{g.length}</td>
+                <td className="px-3 py-2.5 text-gray-400">{g.maxAttempts}</td>
+                <td className="px-3 py-2.5"><Badge color={g.difficulty === 'easy' ? 'green' : g.difficulty === 'hard' ? 'red' : 'yellow'}>{g.difficulty}</Badge></td>
+                <td className="px-3 py-2.5"><Badge color={g.isActive ? 'green' : 'gray'}>{g.isActive ? 'Active' : 'Inactive'}</Badge></td>
+                <td className="px-3 py-2.5 text-gray-500">{new Date(g.createdAt).toLocaleDateString()}</td>
+                <td className="px-3 py-2.5 text-right space-x-2">
                   {g.shareCode && (
-                    <button
-                      onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/g/${g.shareCode}`); setMsg({ text: 'Link copied!', type: 'success' }); }}
-                      className="text-blue-600 hover:text-blue-800 text-xs"
-                    >
-                      Copy Link
-                    </button>
+                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/g/${g.shareCode}`); setMsg({ text: 'Link copied!', type: 'success' }); }} className="text-blue-400 hover:text-blue-300 text-xs">Copy Link</button>
                   )}
-                  <button onClick={() => toggleActive(g)} className={`text-xs ${g.isActive ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'}`}>
+                  <button onClick={() => toggleActive(g)} className={`text-xs ${g.isActive ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}>
                     {g.isActive ? 'Deactivate' : 'Activate'}
                   </button>
                 </td>
@@ -626,7 +524,7 @@ function GamesTab() {
             ))}
           </tbody>
         </table>
-        {games.length === 0 && <p className="text-center text-gray-400 py-8">No custom games yet.</p>}
+        {games.length === 0 && <p className="text-center text-gray-600 py-8">No custom games yet.</p>}
       </div>
     </div>
   );
@@ -650,8 +548,7 @@ function UsersTab() {
 
   async function changeRole(userId: string, role: string) {
     const res = await fetch('/api/admin/users', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, role }),
     }).then(r => r.json());
     if (res.ok) { setMsg({ text: 'Role updated', type: 'success' }); fetchUsers(); }
@@ -662,8 +559,7 @@ function UsersTab() {
     const action = isBanned ? 'unban' : 'ban';
     if (!confirm(`Are you sure you want to ${action} this user?`)) return;
     const res = await fetch('/api/admin/users', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, ban: !isBanned }),
     }).then(r => r.json());
     if (res.ok) { setMsg({ text: `User ${action}ned`, type: 'success' }); fetchUsers(); }
@@ -674,48 +570,35 @@ function UsersTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold">Users ({users.length})</h2>
+      <h2 className="text-lg font-bold text-white">Users ({users.length})</h2>
       {msg && <StatusMessage message={msg.text} type={msg.type} />}
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto glass rounded-xl">
         <table className="w-full text-sm">
-          <thead className="bg-gray-100">
+          <thead className="border-b border-gray-800">
             <tr>
-              <th className="text-left px-3 py-2 font-medium">Name</th>
-              <th className="text-left px-3 py-2 font-medium">Email</th>
-              <th className="text-left px-3 py-2 font-medium">Role</th>
-              <th className="text-left px-3 py-2 font-medium">Status</th>
-              <th className="text-left px-3 py-2 font-medium">Joined</th>
-              <th className="text-right px-3 py-2 font-medium">Actions</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Name</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Email</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Role</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Status</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Joined</th>
+              <th className="text-right px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-gray-800/50">
             {users.map(u => (
-              <tr key={u.id} className="hover:bg-gray-50">
-                <td className="px-3 py-2 font-medium">{u.displayName}</td>
-                <td className="px-3 py-2 text-gray-500">{u.email}</td>
-                <td className="px-3 py-2">
-                  <select
-                    value={u.role}
-                    onChange={(e) => changeRole(u.id, e.target.value)}
-                    className="border rounded px-2 py-1 text-xs"
-                  >
-                    <option value="USER">USER</option>
-                    <option value="CREATOR">CREATOR</option>
-                    <option value="ADMIN">ADMIN</option>
+              <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                <td className="px-3 py-2.5 font-medium text-white">{u.displayName}</td>
+                <td className="px-3 py-2.5 text-gray-400">{u.email}</td>
+                <td className="px-3 py-2.5">
+                  <select value={u.role} onChange={(e) => changeRole(u.id, e.target.value)} className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                    <option value="USER">USER</option><option value="CREATOR">CREATOR</option><option value="ADMIN">ADMIN</option>
                   </select>
                 </td>
-                <td className="px-3 py-2">
-                  <Badge color={u.bannedAt ? 'red' : 'green'}>
-                    {u.bannedAt ? 'Banned' : 'Active'}
-                  </Badge>
-                </td>
-                <td className="px-3 py-2 text-gray-500">{new Date(u.createdAt).toLocaleDateString()}</td>
-                <td className="px-3 py-2 text-right">
-                  <button
-                    onClick={() => toggleBan(u.id, !!u.bannedAt)}
-                    className={`text-xs ${u.bannedAt ? 'text-green-600 hover:text-green-800' : 'text-red-600 hover:text-red-800'}`}
-                  >
+                <td className="px-3 py-2.5"><Badge color={u.bannedAt ? 'red' : 'green'}>{u.bannedAt ? 'Banned' : 'Active'}</Badge></td>
+                <td className="px-3 py-2.5 text-gray-500">{new Date(u.createdAt).toLocaleDateString()}</td>
+                <td className="px-3 py-2.5 text-right">
+                  <button onClick={() => toggleBan(u.id, !!u.bannedAt)} className={`text-xs ${u.bannedAt ? 'text-green-400 hover:text-green-300' : 'text-red-400 hover:text-red-300'}`}>
                     {u.bannedAt ? 'Unban' : 'Ban'}
                   </button>
                 </td>
@@ -748,33 +631,33 @@ function AuditTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold">Audit Logs ({logs.length})</h2>
+      <h2 className="text-lg font-bold text-white">Audit Logs ({logs.length})</h2>
       {msg && <StatusMessage message={msg.text} type={msg.type} />}
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto glass rounded-xl">
         <table className="w-full text-sm">
-          <thead className="bg-gray-100">
+          <thead className="border-b border-gray-800">
             <tr>
-              <th className="text-left px-3 py-2 font-medium">Time</th>
-              <th className="text-left px-3 py-2 font-medium">Actor</th>
-              <th className="text-left px-3 py-2 font-medium">Action</th>
-              <th className="text-left px-3 py-2 font-medium">Target</th>
-              <th className="text-left px-3 py-2 font-medium">Details</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Time</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Actor</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Action</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Target</th>
+              <th className="text-left px-3 py-2.5 font-bold text-gray-400 text-xs uppercase tracking-wider">Details</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-gray-800/50">
             {logs.map(l => (
-              <tr key={l.id} className="hover:bg-gray-50">
-                <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{new Date(l.createdAt).toLocaleString()}</td>
-                <td className="px-3 py-2">{l.actor?.displayName ?? 'Unknown'}</td>
-                <td className="px-3 py-2"><Badge color="blue">{l.action}</Badge></td>
-                <td className="px-3 py-2 text-gray-500">{l.targetType}{l.targetId ? ` #${l.targetId.slice(0, 8)}` : ''}</td>
-                <td className="px-3 py-2 text-gray-400 text-xs font-mono max-w-xs truncate">{JSON.stringify(l.metadata)}</td>
+              <tr key={l.id} className="hover:bg-white/5 transition-colors">
+                <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap text-xs">{new Date(l.createdAt).toLocaleString()}</td>
+                <td className="px-3 py-2.5 text-white">{l.actor?.displayName ?? 'Unknown'}</td>
+                <td className="px-3 py-2.5"><Badge color="blue">{l.action}</Badge></td>
+                <td className="px-3 py-2.5 text-gray-400">{l.targetType}{l.targetId ? ` #${l.targetId.slice(0, 8)}` : ''}</td>
+                <td className="px-3 py-2.5 text-gray-600 text-xs font-mono max-w-xs truncate">{JSON.stringify(l.metadata)}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {logs.length === 0 && <p className="text-center text-gray-400 py-8">No audit logs yet.</p>}
+        {logs.length === 0 && <p className="text-center text-gray-600 py-8">No audit logs yet.</p>}
       </div>
     </div>
   );
@@ -806,26 +689,28 @@ function AdminContent() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4">
-      <aside className="bg-white rounded-lg shadow p-4 space-y-1">
-        <h2 className="font-bold text-sm uppercase tracking-wide text-gray-500 mb-3">Admin Panel</h2>
-        {TABS.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => router.push(`/admin?tab=${tab.key}`)}
-            className={`block w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-              activeTab === tab.key
-                ? 'bg-green-50 text-green-700 font-semibold'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </aside>
-      <section className="bg-white rounded-lg shadow p-6 min-h-[400px]">
-        {renderTab()}
-      </section>
+    <div className="animate-fade-in">
+      <h1 className="text-3xl font-black text-white text-center mb-6 tracking-wide">Admin Panel</h1>
+      <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4">
+        <aside className="glass rounded-xl p-4 space-y-1">
+          {TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => router.push(`/admin?tab=${tab.key}`)}
+              className={`block w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
+                activeTab === tab.key
+                  ? 'bg-correct/20 text-correct font-bold'
+                  : 'text-gray-400 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </aside>
+        <section className="glass rounded-xl p-6 min-h-[400px]">
+          {renderTab()}
+        </section>
+      </div>
     </div>
   );
 }

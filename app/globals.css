@@ -2,15 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-correct: #538d4e;
+  --color-present: #b59f3b;
+  --color-absent: #3a3a3c;
+  --color-tile-bg: #121213;
+  --color-tile-border: #3a3a3c;
+  --color-tile-text: #ffffff;
+  --color-key-bg: #818384;
+  --color-key-text: #ffffff;
+}
+
 body {
-  @apply bg-gray-50 text-gray-900;
+  @apply bg-gray-950 text-white;
+  font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
 }
 
 * {
   box-sizing: border-box;
 }
 
-/* Tile flip animation (Wordle-style reveal) */
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-700 rounded-full;
+}
+
+/* ─── Tile flip animation (Wordle-style reveal) ─── */
 @keyframes flip-in {
   0% {
     transform: rotateX(0deg);
@@ -40,10 +63,10 @@ body {
 .tile-delay-8 { animation-delay: 800ms; }
 .tile-delay-9 { animation-delay: 900ms; }
 
-/* Pop animation when a letter is typed */
+/* ─── Pop animation when a letter is typed ─── */
 @keyframes pop {
   0% { transform: scale(1); }
-  50% { transform: scale(1.12); }
+  50% { transform: scale(1.15); }
   100% { transform: scale(1); }
 }
 
@@ -51,11 +74,11 @@ body {
   animation: pop 0.1s ease-in-out;
 }
 
-/* Bounce animation on win */
+/* ─── Bounce animation on win ─── */
 @keyframes bounce-tile {
   0%, 100% { transform: translateY(0); }
-  30% { transform: translateY(-20px); }
-  60% { transform: translateY(-10px); }
+  25% { transform: translateY(-25px); }
+  50% { transform: translateY(-10px); }
 }
 
 .tile-bounce {
@@ -73,42 +96,102 @@ body {
 .bounce-delay-8 { animation-delay: 800ms; }
 .bounce-delay-9 { animation-delay: 900ms; }
 
-/* Row shake animation for invalid guesses */
+/* ─── Row shake animation for invalid guesses ─── */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  10%, 50%, 90% { transform: translateX(-4px); }
-  30%, 70% { transform: translateX(4px); }
+  10%, 50%, 90% { transform: translateX(-5px); }
+  30%, 70% { transform: translateX(5px); }
 }
 
 .row-shake {
   animation: shake 0.4s ease;
 }
 
-/* Toast notification */
+/* ─── Toast notification ─── */
 @keyframes toast-in {
-  0% { opacity: 0; transform: translateY(-10px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% { opacity: 0; transform: translateY(-16px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes toast-out {
-  0% { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-10px); }
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-16px) scale(0.95); }
 }
 
 .toast-enter {
-  animation: toast-in 0.2s ease-out forwards;
+  animation: toast-in 0.25s ease-out forwards;
 }
 
 .toast-exit {
   animation: toast-out 0.3s ease-in forwards;
 }
 
-/* Stats modal */
+/* ─── Stats modal ─── */
 @keyframes modal-in {
-  0% { opacity: 0; transform: scale(0.95); }
-  100% { opacity: 1; transform: scale(1); }
+  0% { opacity: 0; transform: scale(0.9) translateY(20px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .modal-enter {
-  animation: modal-in 0.2s ease-out forwards;
+  animation: modal-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* ─── Fade in ─── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}
+
+/* ─── Pulse glow for active input tile ─── */
+@keyframes pulse-border {
+  0%, 100% { border-color: #565758; }
+  50% { border-color: #878a8c; }
+}
+
+.tile-active-input {
+  animation: pulse-border 1.2s ease-in-out infinite;
+}
+
+/* ─── Celebration confetti ─── */
+@keyframes confetti-fall {
+  0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+.confetti-piece {
+  position: fixed;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  animation: confetti-fall 3s ease-in-out forwards;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* ─── Gradient text ─── */
+.text-gradient {
+  background: linear-gradient(135deg, #538d4e 0%, #b59f3b 50%, #538d4e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Glass morphism ─── */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Glow effects ─── */
+.glow-green {
+  box-shadow: 0 0 20px rgba(83, 141, 78, 0.3);
+}
+
+.glow-yellow {
+  box-shadow: 0 0 20px rgba(181, 159, 59, 0.3);
 }

@@ -15,34 +15,34 @@ function getTileState(ch: string, pattern: string, isSubmitted: boolean): TileSt
 
 function tileClass(state: TileState): string {
   const base =
-    'flex items-center justify-center font-bold text-xl uppercase select-none border-2 transition-colors duration-300';
+    'flex items-center justify-center font-bold uppercase select-none border-2 rounded transition-all duration-300';
   switch (state) {
     case 'correct':
-      return `${base} bg-green-600 text-white border-green-600`;
+      return `${base} bg-correct text-white border-correct`;
     case 'present':
-      return `${base} bg-yellow-500 text-white border-yellow-500`;
+      return `${base} bg-present text-white border-present`;
     case 'absent':
-      return `${base} bg-gray-600 text-white border-gray-600`;
+      return `${base} bg-absent text-white border-absent`;
     case 'tbd':
-      return `${base} bg-white text-gray-900 border-gray-400`;
+      return `${base} bg-transparent text-white border-gray-500`;
     default:
-      return `${base} bg-white text-gray-900 border-gray-300`;
+      return `${base} bg-transparent text-white border-gray-700`;
   }
 }
 
 function keyClass(state: LetterState, wide: boolean): string {
   const base =
-    'rounded font-bold text-sm h-14 flex items-center justify-center cursor-pointer select-none transition-colors duration-200 active:opacity-75';
-  const width = wide ? 'min-w-[56px] px-2 text-xs' : 'w-10';
+    'rounded-lg font-bold text-sm h-14 flex items-center justify-center cursor-pointer select-none transition-all duration-200 active:scale-95';
+  const width = wide ? 'min-w-[58px] px-2 text-xs' : 'w-11';
   switch (state) {
     case 'correct':
-      return `${base} ${width} bg-green-600 text-white`;
+      return `${base} ${width} bg-correct text-white`;
     case 'present':
-      return `${base} ${width} bg-yellow-500 text-white`;
+      return `${base} ${width} bg-present text-white`;
     case 'absent':
-      return `${base} ${width} bg-gray-500 text-white`;
+      return `${base} ${width} bg-gray-700 text-gray-400`;
     default:
-      return `${base} ${width} bg-gray-200 text-gray-900 hover:bg-gray-300`;
+      return `${base} ${width} bg-gray-500 text-white hover:bg-gray-400`;
   }
 }
 
@@ -58,7 +58,7 @@ interface GameStats {
   gamesWon: number;
   currentStreak: number;
   maxStreak: number;
-  guessDistribution: Record<number, number>; // attempts -> count
+  guessDistribution: Record<number, number>;
   lastGameDate: string;
 }
 
@@ -78,7 +78,6 @@ function saveStats(stats: GameStats) {
 
 interface Props {
   shareCode?: string;
-  /** Pass gameId directly to skip the game-fetch step (used by practice mode) */
   gameId?: string;
   gameMeta?: { length: number; maxAttempts: number };
 }
@@ -104,15 +103,14 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
 
   // Animation state
   const [shakeRow, setShakeRow] = useState(-1);
-  const [revealingRow, setRevealingRow] = useState(-1); // row index currently flipping
+  const [revealingRow, setRevealingRow] = useState(-1);
   const [bounceRow, setBounceRow] = useState(-1);
-  const [poppedTile, setPoppedTile] = useState<string>(''); // "row-col" key
+  const [poppedTile, setPoppedTile] = useState<string>('');
 
   // Stats modal
   const [showStats, setShowStats] = useState(false);
   const [stats, setStats] = useState<GameStats>(getStats);
 
-  // Track previously submitted guesses to prevent duplicate counting
   const prevGuessCountRef = useRef(0);
 
   const showToast = useCallback((text: string, duration = 2000) => {
@@ -128,7 +126,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
     }
   }, []);
 
-  // Step 1: Fetch the game (unless gameId provided directly)
+  // Step 1: Fetch the game
   useEffect(() => {
     if (externalGameId) return;
     (async () => {
@@ -148,7 +146,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
     })();
   }, [shareCode, externalGameId, showToast]);
 
-  // Step 2: Start the game once we have a gameId
+  // Step 2: Start the game
   useEffect(() => {
     if (!gameId || gameStarted) return;
     (async () => {
@@ -169,7 +167,6 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
         return;
       }
       setGameStarted(true);
-      // Fetch current game state (for resumed games)
       const state = await fetch(`/api/games/${gameId}/state`).then((r) => r.json());
       if (state.ok) {
         const loadedGuesses = state.data.guesses ?? [];
@@ -182,7 +179,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
     })();
   }, [gameId, gameStarted, hardMode, showToast]);
 
-  // Keyboard letter states derived from submitted guesses
+  // Keyboard letter states
   const letterStates = useMemo<Record<string, LetterState>>(() => {
     const map: Record<string, LetterState> = {};
     for (const g of guesses) {
@@ -202,7 +199,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
     return map;
   }, [guesses]);
 
-  // Board: submitted guesses + current input row + empty rows
+  // Board rows
   const rows = useMemo(() => {
     const out: { guessText: string; resultPattern: string; isSubmitted: boolean }[] = [];
     for (const g of guesses) {
@@ -226,7 +223,6 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
     const word = input.trim();
     if (word.length !== gameLength) {
       showToast('Not enough letters');
-      // Shake the current input row
       setShakeRow(guesses.length);
       setTimeout(() => setShakeRow(-1), 400);
       return;
@@ -242,18 +238,15 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       setSubmitting(false);
       const msg = json.error?.message ?? 'Error submitting guess';
       showToast(msg);
-      // Shake row for invalid word
       setShakeRow(guesses.length);
       setTimeout(() => setShakeRow(-1), 400);
       return;
     }
 
-    // Trigger flip animation for the current row
     const currentRow = guesses.length;
     setRevealingRow(currentRow);
 
-    // Wait for flip animation to complete before updating state
-    const flipDuration = gameLength * 100 + 500; // stagger + animation time
+    const flipDuration = gameLength * 100 + 500;
     setTimeout(async () => {
       const state = await fetch(`/api/games/${gameId}/state`).then((r) => r.json());
       if (state.ok) {
@@ -262,12 +255,10 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
         setStatus(state.data.status ?? 'IN_PROGRESS');
         if (state.data.answer) setAnswer(state.data.answer);
 
-        // Update stats on game completion
         if (state.data.status === 'WIN' || state.data.status === 'LOSS') {
           const currentStats = getStats();
           const today = new Date().toISOString().split('T')[0];
 
-          // Only update if this game hasn't been counted yet
           if (currentStats.lastGameDate !== today || !shareCode) {
             currentStats.gamesPlayed += 1;
             if (state.data.status === 'WIN') {
@@ -284,7 +275,6 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
             setStats(currentStats);
           }
 
-          // Show win bounce or loss message
           if (state.data.status === 'WIN') {
             setBounceRow(newGuesses.length - 1);
             setTimeout(() => setBounceRow(-1), 1500);
@@ -295,7 +285,6 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
             showToast(state.data.answer ?? 'Better luck next time!', 5000);
           }
 
-          // Show stats modal after a delay
           setTimeout(() => setShowStats(true), state.data.status === 'WIN' ? 2500 : 3000);
         }
       }
@@ -316,7 +305,6 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       } else if (/^[A-Z]$/.test(key) && input.length < gameLength) {
         const newLen = input.length;
         setInput((v) => v + key);
-        // Trigger pop animation on the tile
         const tileKey = `${guesses.length}-${newLen}`;
         setPoppedTile(tileKey);
         setTimeout(() => setPoppedTile(''), 100);
@@ -325,7 +313,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
     [status, input, gameLength, submitGuess, submitting, guesses.length]
   );
 
-  // Physical keyboard support
+  // Physical keyboard
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -351,23 +339,27 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
-        <p className="text-gray-500 text-sm animate-pulse">Loading game...</p>
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-correct animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="w-2 h-2 rounded-full bg-present animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="w-2 h-2 rounded-full bg-gray-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
       </div>
     );
   }
 
-  const tileSize = gameLength <= 5 ? 'w-14 h-14' : gameLength <= 7 ? 'w-11 h-11' : 'w-9 h-9';
-
+  const tileSize = gameLength <= 5 ? 'w-16 h-16' : gameLength <= 7 ? 'w-12 h-12' : 'w-10 h-10';
+  const fontSize = gameLength <= 5 ? 'text-2xl' : gameLength <= 7 ? 'text-xl' : 'text-lg';
   const maxDist = Math.max(1, ...Object.values(stats.guessDistribution));
 
   return (
-    <div className="flex flex-col items-center gap-5">
+    <div className="flex flex-col items-center gap-4">
       {/* Toast container */}
       <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`bg-gray-900 text-white px-5 py-3 rounded-lg font-bold text-sm shadow-lg pointer-events-auto ${
+            className={`bg-white text-gray-900 px-6 py-3 rounded-xl font-bold text-sm shadow-2xl pointer-events-auto ${
               t.exiting ? 'toast-exit' : 'toast-enter'
             }`}
           >
@@ -376,97 +368,112 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
         ))}
       </div>
 
-      {/* Game meta */}
+      {/* Game meta bar */}
       {(difficulty || gameLength) && (
-        <div className="flex items-center gap-4 text-xs text-gray-500">
-          {difficulty && <span className="capitalize">Difficulty: {difficulty}</span>}
-          <span>{gameLength} letters &bull; {maxAttempts} tries</span>
-          <label className="flex items-center gap-1 cursor-pointer select-none">
+        <div className="flex items-center gap-3 text-xs">
+          {difficulty && (
+            <span className={`px-2.5 py-1 rounded-full font-semibold capitalize ${
+              difficulty === 'easy' ? 'bg-green-900/50 text-green-400' :
+              difficulty === 'hard' ? 'bg-red-900/50 text-red-400' :
+              'bg-yellow-900/50 text-yellow-400'
+            }`}>
+              {difficulty}
+            </span>
+          )}
+          <span className="text-gray-500">{gameLength} letters</span>
+          <span className="text-gray-600">&bull;</span>
+          <span className="text-gray-500">{maxAttempts} tries</span>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none ml-2">
             <input
               type="checkbox"
               checked={hardMode}
               disabled={guesses.length > 0 || gameStarted}
               onChange={(e) => setHardMode(e.target.checked)}
-              className="accent-green-600"
+              className="accent-correct w-3.5 h-3.5"
             />
-            Hard mode
+            <span className="text-gray-500">Hard</span>
           </label>
         </div>
       )}
 
       {/* Hints panel */}
       {hints.length > 0 && (
-        <div className="w-full max-w-sm bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1.5">
-          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Hints</p>
+        <div className="w-full max-w-sm glass rounded-xl p-4 space-y-2">
+          <p className="text-xs font-bold text-present uppercase tracking-wider">Hints</p>
           {hints.map((h) => (
-            <p key={h.id} className="text-sm text-blue-900">
-              <span className="font-medium">{h.type}:</span> {h.content}
-              <span className="text-xs text-blue-500 ml-1">(-{h.cost} pts)</span>
+            <p key={h.id} className="text-sm text-gray-300">
+              <span className="font-semibold text-white">{h.type}:</span> {h.content}
+              <span className="text-xs text-gray-500 ml-1">(-{h.cost} pts)</span>
             </p>
           ))}
         </div>
       )}
 
-      {/* Game board */}
-      <div className="grid gap-1.5">
-        {rows.map((row, ri) => (
-          <div
-            key={ri}
-            className={`flex gap-1.5 ${shakeRow === ri ? 'row-shake' : ''}`}
-          >
-            {Array.from({ length: gameLength }).map((_, ci) => {
-              const ch = row.guessText[ci]?.trim() ? row.guessText[ci] : '';
-              const pattern = row.resultPattern[ci] ?? 'B';
-              const state = getTileState(ch, pattern, row.isSubmitted);
-              const tileKey = `${ri}-${ci}`;
-              const isRevealing = revealingRow === ri && row.isSubmitted;
-              const isBouncing = bounceRow === ri;
-              const isPopping = poppedTile === tileKey;
+      {/* GAME BOARD */}
+      <div className="grid gap-1.5 my-2">
+        {rows.map((row, ri) => {
+          const isCurrentInputRow = !row.isSubmitted && ri === guesses.length && status === 'IN_PROGRESS';
+          return (
+            <div
+              key={ri}
+              className={`flex gap-1.5 ${shakeRow === ri ? 'row-shake' : ''}`}
+            >
+              {Array.from({ length: gameLength }).map((_, ci) => {
+                const ch = row.guessText[ci]?.trim() ? row.guessText[ci] : '';
+                const pattern = row.resultPattern[ci] ?? 'B';
+                const state = getTileState(ch, pattern, row.isSubmitted);
+                const tileKey = `${ri}-${ci}`;
+                const isRevealing = revealingRow === ri && row.isSubmitted;
+                const isBouncing = bounceRow === ri;
+                const isPopping = poppedTile === tileKey;
+                const isNextInput = isCurrentInputRow && ci === input.length && !ch;
 
-              let animClass = '';
-              if (isRevealing) animClass = `tile-flip tile-delay-${ci}`;
-              else if (isBouncing) animClass = `tile-bounce bounce-delay-${ci}`;
-              else if (isPopping) animClass = 'tile-pop';
+                let animClass = '';
+                if (isRevealing) animClass = `tile-flip tile-delay-${ci}`;
+                else if (isBouncing) animClass = `tile-bounce bounce-delay-${ci}`;
+                else if (isPopping) animClass = 'tile-pop';
+                else if (isNextInput) animClass = 'tile-active-input';
 
-              return (
-                <div
-                  key={ci}
-                  className={`${tileClass(state)} ${tileSize} ${animClass}`}
-                >
-                  {ch}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+                return (
+                  <div
+                    key={ci}
+                    className={`${tileClass(state)} ${tileSize} ${fontSize} ${animClass}`}
+                  >
+                    {ch}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
 
       {/* Win / Loss message */}
       {status === 'WIN' && (
-        <div className="text-center space-y-1">
-          <p className="text-2xl font-bold text-green-600">You won!</p>
-          <p className="text-gray-600 text-sm">
+        <div className="text-center space-y-2 animate-fade-in">
+          <p className="text-3xl font-black text-correct">You won!</p>
+          <p className="text-gray-400 text-sm">
             Solved in {guesses.length} {guesses.length === 1 ? 'guess' : 'guesses'}
           </p>
         </div>
       )}
       {status === 'LOSS' && (
-        <div className="text-center space-y-1">
-          <p className="text-2xl font-bold text-red-600">Game over</p>
+        <div className="text-center space-y-2 animate-fade-in">
+          <p className="text-3xl font-black text-red-500">Game over</p>
           {answer && (
-            <p className="text-gray-700 text-sm">
-              The word was <span className="font-bold uppercase tracking-wider">{answer}</span>
+            <p className="text-gray-400 text-sm">
+              The word was <span className="font-black uppercase tracking-widest text-white text-lg">{answer}</span>
             </p>
           )}
         </div>
       )}
 
-      {/* Share + Hint + Stats buttons */}
-      <div className="flex gap-3">
+      {/* Action buttons */}
+      <div className="flex gap-3 flex-wrap justify-center">
         {status !== 'IN_PROGRESS' && (
           <>
             <button
-              className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg font-semibold text-sm transition-colors"
+              className="bg-correct hover:bg-green-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-105 active:scale-95 glow-green"
               onClick={async () => {
                 const header = status === 'WIN'
                   ? `Wordel ${guesses.length}/${maxAttempts}`
@@ -483,10 +490,10 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
                 showToast('Copied to clipboard!');
               }}
             >
-              Share result
+              Share Result
             </button>
             <button
-              className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-2 rounded-lg font-semibold text-sm transition-colors"
+              className="glass text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-105 active:scale-95"
               onClick={() => setShowStats(true)}
             >
               Statistics
@@ -495,7 +502,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
         )}
         {status === 'IN_PROGRESS' && gameStarted && (
           <button
-            className="text-sm text-purple-700 hover:text-purple-900 underline transition-colors"
+            className="text-sm text-present hover:text-yellow-400 font-medium transition-colors"
             onClick={requestHint}
           >
             Get a hint (costs points)
@@ -503,16 +510,20 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
         )}
       </div>
 
-      {/* On-screen keyboard */}
-      <div className="w-full max-w-lg space-y-1.5 mt-2">
+      {/* ON-SCREEN KEYBOARD */}
+      <div className="w-full max-w-lg space-y-1.5 mt-1">
         {KEYBOARD_ROWS.map((row, ri) => (
-          <div key={ri} className="flex justify-center gap-1">
+          <div key={ri} className="flex justify-center gap-1.5">
             {row.map((k) => {
               const state: LetterState = letterStates[k] ?? 'unused';
               const isWide = k === 'ENTER' || k === 'BACKSPACE';
               return (
                 <button key={k} className={keyClass(state, isWide)} onClick={() => handleKey(k)}>
-                  {k === 'BACKSPACE' ? '\u232B' : k}
+                  {k === 'BACKSPACE' ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414-6.414a2 2 0 011.414-.586H19a2 2 0 012 2v10a2 2 0 01-2 2h-8.172a2 2 0 01-1.414-.586L3 12z" />
+                    </svg>
+                  ) : k}
                 </button>
               );
             })}
@@ -520,28 +531,44 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
         ))}
       </div>
 
-      {/* Statistics Modal */}
+      {/* Color legend */}
+      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded bg-correct" />
+          <span>Correct spot</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded bg-present" />
+          <span>Wrong spot</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded bg-absent" />
+          <span>Not in word</span>
+        </div>
+      </div>
+
+      {/* STATISTICS MODAL */}
       {showStats && (
         <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowStats(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 modal-enter"
+            className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 modal-enter"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold tracking-wide uppercase">Statistics</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-black tracking-wider uppercase text-white">Statistics</h2>
               <button
                 onClick={() => setShowStats(false)}
-                className="text-gray-400 hover:text-gray-700 text-xl font-bold leading-none"
+                className="text-gray-500 hover:text-white text-2xl font-bold leading-none transition-colors"
               >
                 &times;
               </button>
             </div>
 
             {/* Summary stats */}
-            <div className="grid grid-cols-4 gap-2 mb-6">
+            <div className="grid grid-cols-4 gap-3 mb-8">
               {[
                 { value: stats.gamesPlayed, label: 'Played' },
                 { value: stats.gamesPlayed > 0 ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0, label: 'Win %' },
@@ -549,28 +576,28 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
                 { value: stats.maxStreak, label: 'Max Streak' },
               ].map(({ value, label }) => (
                 <div key={label} className="text-center">
-                  <p className="text-2xl font-bold">{value}</p>
-                  <p className="text-xs text-gray-500 leading-tight">{label}</p>
+                  <p className="text-3xl font-black text-white">{value}</p>
+                  <p className="text-[10px] text-gray-500 leading-tight mt-1">{label}</p>
                 </div>
               ))}
             </div>
 
             {/* Guess distribution */}
-            <h3 className="text-sm font-bold uppercase tracking-wide mb-3">Guess Distribution</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">Guess Distribution</h3>
             {stats.gamesPlayed === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">No data yet</p>
+              <p className="text-sm text-gray-600 text-center py-6">No data yet</p>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {Array.from({ length: maxAttempts }).map((_, i) => {
                   const count = stats.guessDistribution[i + 1] ?? 0;
-                  const width = Math.max(8, (count / maxDist) * 100);
+                  const width = Math.max(10, (count / maxDist) * 100);
                   const isLastGuess = status === 'WIN' && guesses.length === i + 1;
                   return (
                     <div key={i} className="flex items-center gap-2">
-                      <span className="text-sm font-bold w-3 text-right">{i + 1}</span>
+                      <span className="text-sm font-bold w-3 text-right text-gray-400">{i + 1}</span>
                       <div
-                        className={`h-5 flex items-center justify-end px-1.5 text-xs font-bold text-white rounded-sm ${
-                          isLastGuess ? 'bg-green-600' : 'bg-gray-500'
+                        className={`h-6 flex items-center justify-end px-2 text-xs font-bold text-white rounded transition-all ${
+                          isLastGuess ? 'bg-correct' : 'bg-gray-700'
                         }`}
                         style={{ width: `${width}%` }}
                       >

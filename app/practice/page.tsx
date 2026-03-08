@@ -28,15 +28,17 @@ export default function PracticePage() {
   }
 
   return (
-    <div>
-      <h1 className="text-xl font-bold mb-1">Practice Mode</h1>
-      <p className="text-sm text-gray-500 mb-5">Practice with a random word - no limits, replay anytime.</p>
+    <div className="animate-fade-in">
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-black tracking-wide text-white">Practice Mode</h1>
+        <p className="text-sm text-gray-500 mt-2">Sharpen your skills with unlimited rounds</p>
+      </div>
 
       {error && (
-        <div className="mb-4 px-4 py-2 bg-red-100 text-red-800 rounded text-sm">
+        <div className="mb-6 px-4 py-3 glass rounded-xl text-red-400 text-sm text-center">
           {error}
           {error.includes('log in') && (
-            <a href="/login" className="ml-2 underline font-bold">
+            <a href="/login" className="ml-2 underline font-bold text-correct">
               Log in
             </a>
           )}
@@ -44,14 +46,20 @@ export default function PracticePage() {
       )}
 
       {!practiceGame ? (
-        <div className="flex flex-col items-center gap-4 py-12">
-          <p className="text-gray-600 text-center max-w-xs">
-            Start a practice round to improve your Wordel skills. A random 5-letter word will be chosen for you.
+        <div className="flex flex-col items-center gap-6 py-16">
+          <div className="flex gap-2">
+            <div className="w-12 h-12 rounded bg-correct flex items-center justify-center text-white font-bold text-xl">P</div>
+            <div className="w-12 h-12 rounded bg-present flex items-center justify-center text-white font-bold text-xl">L</div>
+            <div className="w-12 h-12 rounded bg-absent flex items-center justify-center text-white font-bold text-xl">A</div>
+            <div className="w-12 h-12 rounded bg-correct flex items-center justify-center text-white font-bold text-xl">Y</div>
+          </div>
+          <p className="text-gray-400 text-center max-w-xs text-sm">
+            Practice with random 5-letter words. No limits, no pressure. Play as many as you want.
           </p>
           <button
             onClick={startPractice}
             disabled={loading}
-            className="bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-semibold px-8 py-3 rounded-lg text-lg transition-colors"
+            className="bg-correct hover:bg-green-600 disabled:opacity-60 text-white font-bold px-10 py-3.5 rounded-xl text-lg transition-all hover:scale-105 active:scale-95 glow-green"
           >
             {loading ? 'Starting...' : 'Start Practice'}
           </button>
@@ -62,10 +70,10 @@ export default function PracticePage() {
             gameId={practiceGame.gameId}
             gameMeta={{ length: practiceGame.length, maxAttempts: practiceGame.maxAttempts }}
           />
-          <div className="mt-6 flex justify-center">
+          <div className="mt-8 flex justify-center">
             <button
               onClick={() => { setPracticeGame(null); setError(''); }}
-              className="text-sm text-gray-500 hover:text-gray-700 underline transition-colors"
+              className="text-sm text-gray-500 hover:text-white font-medium transition-colors glass px-4 py-2 rounded-lg"
             >
               Play another word
             </button>
