@@ -11,6 +11,7 @@ export function NavBar() {
   const navLinks = [
     { href: '/daily' as const, label: 'Daily' },
     { href: '/practice' as const, label: 'Practice' },
+    { href: '/endless' as const, label: 'Endless' },
     { href: '/create-room' as const, label: 'Create Room' },
     { href: '/leaderboard' as const, label: 'Leaderboard' },
   ];

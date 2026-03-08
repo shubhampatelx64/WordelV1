@@ -93,9 +93,10 @@ interface Props {
   shareCode?: string;
   gameId?: string;
   gameMeta?: { length: number; maxAttempts: number };
+  onGameEnd?: (status: 'WIN' | 'LOSS', attempts: number) => void;
 }
 
-export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }: Props) {
+export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta, onGameEnd }: Props) {
   const [gameId, setGameId] = useState<string | null>(externalGameId ?? null);
   const [gameLength, setGameLength] = useState<number>(gameMeta?.length ?? 5);
   const [maxAttempts, setMaxAttempts] = useState<number>(gameMeta?.maxAttempts ?? 6);
@@ -303,6 +304,10 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
           }
 
           setTimeout(() => setShowStats(true), state.data.status === 'WIN' ? 3000 : 3500);
+
+          if (onGameEnd) {
+            onGameEnd(state.data.status as 'WIN' | 'LOSS', newGuesses.length);
+          }
         }
       }
       setRevealingRow(-1);
