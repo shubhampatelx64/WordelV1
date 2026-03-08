@@ -2,113 +2,336 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-correct: #538d4e;
+  --color-present: #b59f3b;
+  --color-absent: #3a3a3c;
+  --color-tile-bg: #121213;
+  --color-tile-border: #3a3a3c;
+  --color-tile-text: #ffffff;
+  --color-key-bg: #818384;
+  --color-key-text: #ffffff;
+}
+
 body {
-  @apply bg-gray-50 text-gray-900;
+  @apply bg-gray-950 text-white;
+  font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
 }
 
 * {
   box-sizing: border-box;
 }
 
-/* Tile flip animation (Wordle-style reveal) */
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-700 rounded-full;
+}
+
+/* ─── Tile flip animation (two-phase: hide then reveal color) ─── */
 @keyframes flip-in {
   0% {
-    transform: rotateX(0deg);
+    transform: rotateX(0deg) scale(1);
   }
-  50% {
-    transform: rotateX(-90deg);
+  45% {
+    transform: rotateX(-90deg) scale(1.05);
+  }
+  55% {
+    transform: rotateX(-90deg) scale(1.05);
   }
   100% {
-    transform: rotateX(0deg);
+    transform: rotateX(0deg) scale(1);
   }
 }
 
 .tile-flip {
-  animation: flip-in 0.5s ease-in-out;
+  animation: flip-in 0.55s ease-in-out;
   animation-fill-mode: forwards;
+  transform-style: preserve-3d;
+  perspective: 600px;
 }
 
 /* Stagger delays for each tile in a row */
 .tile-delay-0 { animation-delay: 0ms; }
-.tile-delay-1 { animation-delay: 100ms; }
-.tile-delay-2 { animation-delay: 200ms; }
-.tile-delay-3 { animation-delay: 300ms; }
-.tile-delay-4 { animation-delay: 400ms; }
-.tile-delay-5 { animation-delay: 500ms; }
-.tile-delay-6 { animation-delay: 600ms; }
-.tile-delay-7 { animation-delay: 700ms; }
-.tile-delay-8 { animation-delay: 800ms; }
-.tile-delay-9 { animation-delay: 900ms; }
+.tile-delay-1 { animation-delay: 150ms; }
+.tile-delay-2 { animation-delay: 300ms; }
+.tile-delay-3 { animation-delay: 450ms; }
+.tile-delay-4 { animation-delay: 600ms; }
+.tile-delay-5 { animation-delay: 750ms; }
+.tile-delay-6 { animation-delay: 900ms; }
+.tile-delay-7 { animation-delay: 1050ms; }
+.tile-delay-8 { animation-delay: 1200ms; }
+.tile-delay-9 { animation-delay: 1350ms; }
 
-/* Pop animation when a letter is typed */
+/* ─── Pop animation when a letter is typed ─── */
 @keyframes pop {
   0% { transform: scale(1); }
-  50% { transform: scale(1.12); }
+  40% { transform: scale(1.2); }
   100% { transform: scale(1); }
 }
 
 .tile-pop {
-  animation: pop 0.1s ease-in-out;
+  animation: pop 0.12s ease-in-out;
 }
 
-/* Bounce animation on win */
+/* ─── Bounce animation on win ─── */
 @keyframes bounce-tile {
-  0%, 100% { transform: translateY(0); }
-  30% { transform: translateY(-20px); }
-  60% { transform: translateY(-10px); }
+  0%, 100% { transform: translateY(0) scale(1); }
+  15% { transform: translateY(-30px) scale(1.1); }
+  30% { transform: translateY(0) scale(1); }
+  45% { transform: translateY(-15px) scale(1.05); }
+  60% { transform: translateY(0) scale(1); }
+  75% { transform: translateY(-5px) scale(1.02); }
 }
 
 .tile-bounce {
-  animation: bounce-tile 0.6s ease;
+  animation: bounce-tile 1s ease;
 }
 
 .bounce-delay-0 { animation-delay: 0ms; }
-.bounce-delay-1 { animation-delay: 100ms; }
-.bounce-delay-2 { animation-delay: 200ms; }
-.bounce-delay-3 { animation-delay: 300ms; }
-.bounce-delay-4 { animation-delay: 400ms; }
-.bounce-delay-5 { animation-delay: 500ms; }
-.bounce-delay-6 { animation-delay: 600ms; }
-.bounce-delay-7 { animation-delay: 700ms; }
-.bounce-delay-8 { animation-delay: 800ms; }
-.bounce-delay-9 { animation-delay: 900ms; }
+.bounce-delay-1 { animation-delay: 80ms; }
+.bounce-delay-2 { animation-delay: 160ms; }
+.bounce-delay-3 { animation-delay: 240ms; }
+.bounce-delay-4 { animation-delay: 320ms; }
+.bounce-delay-5 { animation-delay: 400ms; }
+.bounce-delay-6 { animation-delay: 480ms; }
+.bounce-delay-7 { animation-delay: 560ms; }
+.bounce-delay-8 { animation-delay: 640ms; }
+.bounce-delay-9 { animation-delay: 720ms; }
 
-/* Row shake animation for invalid guesses */
+/* ─── Row shake animation for invalid guesses ─── */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  10%, 50%, 90% { transform: translateX(-4px); }
-  30%, 70% { transform: translateX(4px); }
+  10%, 50%, 90% { transform: translateX(-6px); }
+  30%, 70% { transform: translateX(6px); }
 }
 
 .row-shake {
   animation: shake 0.4s ease;
 }
 
-/* Toast notification */
+/* ─── Toast notification ─── */
 @keyframes toast-in {
-  0% { opacity: 0; transform: translateY(-10px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% { opacity: 0; transform: translateY(-20px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes toast-out {
-  0% { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-10px); }
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-20px) scale(0.9); }
 }
 
 .toast-enter {
-  animation: toast-in 0.2s ease-out forwards;
+  animation: toast-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
 .toast-exit {
   animation: toast-out 0.3s ease-in forwards;
 }
 
-/* Stats modal */
+/* ─── Stats modal ─── */
 @keyframes modal-in {
-  0% { opacity: 0; transform: scale(0.95); }
-  100% { opacity: 1; transform: scale(1); }
+  0% { opacity: 0; transform: scale(0.85) translateY(30px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .modal-enter {
-  animation: modal-in 0.2s ease-out forwards;
+  animation: modal-in 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* ─── Fade in ─── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}
+
+/* ─── Pulse glow for active input tile ─── */
+@keyframes pulse-border {
+  0%, 100% { border-color: #565758; box-shadow: none; }
+  50% { border-color: #d7dadc; box-shadow: 0 0 8px rgba(215, 218, 220, 0.3); }
+}
+
+.tile-active-input {
+  animation: pulse-border 1.2s ease-in-out infinite;
+}
+
+/* ─── Tile filled glow (when user types a letter) ─── */
+@keyframes fill-glow {
+  0% { border-color: #565758; }
+  100% { border-color: #d7dadc; }
+}
+
+.tile-filled {
+  border-color: #878a8c !important;
+  transition: border-color 0.15s ease;
+}
+
+/* ─── Correct tile glow ─── */
+.tile-correct-glow {
+  box-shadow: 0 0 12px rgba(83, 141, 78, 0.5), 0 0 4px rgba(83, 141, 78, 0.3);
+}
+
+/* ─── Present tile glow ─── */
+.tile-present-glow {
+  box-shadow: 0 0 12px rgba(181, 159, 59, 0.5), 0 0 4px rgba(181, 159, 59, 0.3);
+}
+
+/* ─── Absent tile subtle ─── */
+.tile-absent-glow {
+  box-shadow: 0 0 4px rgba(58, 58, 60, 0.3);
+}
+
+/* ─── Celebration confetti ─── */
+@keyframes confetti-fall {
+  0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+.confetti-piece {
+  position: fixed;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  animation: confetti-fall 3s ease-in forwards;
+  pointer-events: none;
+  z-index: 100;
+  border-radius: 2px;
+}
+
+/* ─── Win celebration text ─── */
+@keyframes celebrate-text {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { transform: scale(1.1); }
+  70% { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.celebrate-text {
+  animation: celebrate-text 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* ─── Loss shake text ─── */
+@keyframes loss-reveal {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.loss-reveal {
+  animation: loss-reveal 0.5s ease-out forwards;
+}
+
+/* ─── Keyboard key press ─── */
+@keyframes key-press {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+.key-press {
+  animation: key-press 0.1s ease;
+}
+
+/* ─── Gradient text ─── */
+.text-gradient {
+  background: linear-gradient(135deg, #538d4e 0%, #b59f3b 50%, #538d4e 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-shift 3s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ─── Glass morphism ─── */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Glow effects ─── */
+.glow-green {
+  box-shadow: 0 0 20px rgba(83, 141, 78, 0.3), 0 0 60px rgba(83, 141, 78, 0.1);
+}
+
+.glow-yellow {
+  box-shadow: 0 0 20px rgba(181, 159, 59, 0.3), 0 0 60px rgba(181, 159, 59, 0.1);
+}
+
+/* ─── Progress bar shimmer ─── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.progress-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* ─── Keyboard correct/present glow ─── */
+.key-correct {
+  box-shadow: 0 0 8px rgba(83, 141, 78, 0.4);
+}
+
+.key-present {
+  box-shadow: 0 0 8px rgba(181, 159, 59, 0.4);
+}
+
+/* ─── Floating particles ─── */
+@keyframes float-particle {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
+  25% { transform: translateY(-20px) translateX(10px); opacity: 0.6; }
+  50% { transform: translateY(-10px) translateX(-5px); opacity: 0.4; }
+  75% { transform: translateY(-25px) translateX(5px); opacity: 0.5; }
+}
+
+.particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: float-particle 4s ease-in-out infinite;
+}
+
+/* ─── Attempt dots pulse ─── */
+@keyframes dot-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* ─── Row slide in ─── */
+@keyframes slide-in-row {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.row-slide-in {
+  animation: slide-in-row 0.3s ease-out forwards;
+}
+
+/* ─── Streak fire ─── */
+@keyframes fire-flicker {
+  0%, 100% { text-shadow: 0 0 4px #ff6b35, 0 0 11px #ff6b35; }
+  50% { text-shadow: 0 0 8px #ff6b35, 0 0 20px #ff6b35, 0 0 30px #ff4500; }
+}
+
+.streak-fire {
+  animation: fire-flicker 1.5s ease-in-out infinite;
+  color: #ff6b35;
 }

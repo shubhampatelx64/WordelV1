@@ -32,61 +32,61 @@ export function SignupForm() {
           return;
         }
         setSuccess(true);
-        // Auto-login after signup
         const loginRes = await signIn('credentials', { email, password, redirect: false });
         if (loginRes?.ok) router.push('/daily');
       }}
     >
       {success ? (
-        <div className="text-center py-4">
-          <p className="text-green-700 font-medium">Account created! Redirecting...</p>
+        <div className="text-center py-6">
+          <p className="text-3xl mb-3">&#127881;</p>
+          <p className="text-correct font-bold">Account created! Redirecting...</p>
         </div>
       ) : (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1.5">Display Name</label>
             <input
               required
-              className="border border-gray-300 rounded-lg p-2.5 w-full focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="bg-gray-800 border border-gray-700 rounded-lg p-3 w-full text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-correct focus:border-transparent transition-all"
               placeholder="Your name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1.5">Email</label>
             <input
               type="email"
               required
-              className="border border-gray-300 rounded-lg p-2.5 w-full focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="bg-gray-800 border border-gray-700 rounded-lg p-3 w-full text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-correct focus:border-transparent transition-all"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1.5">Password</label>
             <input
               type="password"
               required
               minLength={8}
-              className="border border-gray-300 rounded-lg p-2.5 w-full focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="bg-gray-800 border border-gray-700 rounded-lg p-3 w-full text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-correct focus:border-transparent transition-all"
               placeholder="Min. 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          {message && <p className="text-red-600 text-sm">{message}</p>}
+          {message && <p className="text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-lg">{message}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors"
+            className="w-full bg-correct hover:bg-green-600 disabled:opacity-60 text-white font-bold py-3 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
           <p className="text-sm text-center text-gray-500">
             Already have an account?{' '}
-            <Link href="/login" className="text-green-600 hover:underline font-medium">
+            <Link href="/login" className="text-correct hover:underline font-medium">
               Log in
             </Link>
           </p>
