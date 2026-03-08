@@ -39,11 +39,6 @@ export async function POST(req: NextRequest, { params }: { params: { gameId: str
     if (guessText.length !== gamePlay.game.length) return fail('VALIDATION_ERROR', 'Guess has wrong length', 400);
     if (!/^[A-Z]+$/.test(guessText)) return fail('VALIDATION_ERROR', 'Guess must contain A-Z only', 400);
 
-    if (gamePlay.game.dictionaryMode === 'STRICT') {
-      const allowed = await tx.word.findUnique({ where: { text: guessText } });
-      if (!allowed || !allowed.isActive) return fail('INVALID_WORD', 'Guess is not in dictionary', 400);
-    }
-
     if (gamePlay.hardMode) {
       const ruleError = validateHardMode(
         gamePlay.guesses.map((g: { resultPattern: string }) => g.resultPattern),
