@@ -9,9 +9,9 @@ export function NavBar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks = [
-    { href: '/daily', label: 'Daily' },
-    { href: '/practice', label: 'Practice' },
-    { href: '/leaderboard', label: 'Leaderboard' },
+    { href: '/daily' as const, label: 'Daily' },
+    { href: '/practice' as const, label: 'Practice' },
+    { href: '/leaderboard' as const, label: 'Leaderboard' },
   ];
 
   return (

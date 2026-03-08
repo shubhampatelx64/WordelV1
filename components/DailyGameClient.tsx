@@ -13,36 +13,36 @@ function getTileState(ch: string, pattern: string, isSubmitted: boolean): TileSt
   return 'absent';
 }
 
-function tileClass(state: TileState): string {
+function tileClass(state: TileState, hasLetter: boolean): string {
   const base =
-    'flex items-center justify-center font-bold uppercase select-none border-2 rounded transition-all duration-300';
+    'flex items-center justify-center font-extrabold uppercase select-none border-2 rounded-lg transition-all duration-300';
   switch (state) {
     case 'correct':
-      return `${base} bg-correct text-white border-correct`;
+      return `${base} bg-correct text-white border-correct tile-correct-glow`;
     case 'present':
-      return `${base} bg-present text-white border-present`;
+      return `${base} bg-present text-white border-present tile-present-glow`;
     case 'absent':
-      return `${base} bg-absent text-white border-absent`;
+      return `${base} bg-absent text-white border-absent tile-absent-glow`;
     case 'tbd':
-      return `${base} bg-transparent text-white border-gray-500`;
+      return `${base} bg-transparent text-white ${hasLetter ? 'border-gray-400 tile-filled' : 'border-gray-600'}`;
     default:
-      return `${base} bg-transparent text-white border-gray-700`;
+      return `${base} bg-transparent text-white border-gray-700/50`;
   }
 }
 
 function keyClass(state: LetterState, wide: boolean): string {
   const base =
-    'rounded-lg font-bold text-sm h-14 flex items-center justify-center cursor-pointer select-none transition-all duration-200 active:scale-95';
-  const width = wide ? 'min-w-[58px] px-2 text-xs' : 'w-11';
+    'rounded-lg font-bold text-sm h-14 flex items-center justify-center cursor-pointer select-none transition-all duration-200 active:scale-90';
+  const width = wide ? 'min-w-[62px] px-2 text-xs' : 'w-11';
   switch (state) {
     case 'correct':
-      return `${base} ${width} bg-correct text-white`;
+      return `${base} ${width} bg-correct text-white key-correct hover:brightness-110`;
     case 'present':
-      return `${base} ${width} bg-present text-white`;
+      return `${base} ${width} bg-present text-white key-present hover:brightness-110`;
     case 'absent':
-      return `${base} ${width} bg-gray-700 text-gray-400`;
+      return `${base} ${width} bg-gray-700/80 text-gray-500`;
     default:
-      return `${base} ${width} bg-gray-500 text-white hover:bg-gray-400`;
+      return `${base} ${width} bg-gray-500 text-white hover:bg-gray-400 hover:scale-105`;
   }
 }
 
@@ -51,6 +51,19 @@ const KEYBOARD_ROWS = [
   'ASDFGHJKL'.split(''),
   ['ENTER', ...'ZXCVBNM'.split(''), 'BACKSPACE'],
 ];
+
+const CONFETTI_COLORS = ['#538d4e', '#b59f3b', '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe'];
+
+function spawnConfetti(): { id: number; left: string; color: string; delay: string; size: number; rotation: number }[] {
+  return Array.from({ length: 50 }, (_, i) => ({
+    id: i,
+    left: `${Math.random() * 100}%`,
+    color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+    delay: `${Math.random() * 1.5}s`,
+    size: 6 + Math.random() * 10,
+    rotation: Math.random() * 360,
+  }));
+}
 
 // Stats stored per-user in localStorage
 interface GameStats {
@@ -98,7 +111,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
   const [answer, setAnswer] = useState<string>('');
 
   // Toast messages
-  const [toasts, setToasts] = useState<{ id: number; text: string; exiting: boolean }[]>([]);
+  const [toasts, setToasts] = useState<{ id: number; text: string; exiting: boolean; type?: string }[]>([]);
   const toastIdRef = useRef(0);
 
   // Animation state
@@ -106,6 +119,8 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
   const [revealingRow, setRevealingRow] = useState(-1);
   const [bounceRow, setBounceRow] = useState(-1);
   const [poppedTile, setPoppedTile] = useState<string>('');
+  const [confetti, setConfetti] = useState<ReturnType<typeof spawnConfetti>>([]);
+  const [pressedKey, setPressedKey] = useState<string>('');
 
   // Stats modal
   const [showStats, setShowStats] = useState(false);
@@ -113,9 +128,9 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
 
   const prevGuessCountRef = useRef(0);
 
-  const showToast = useCallback((text: string, duration = 2000) => {
+  const showToast = useCallback((text: string, duration = 2000, type = 'info') => {
     const id = ++toastIdRef.current;
-    setToasts((prev) => [...prev, { id, text, exiting: false }]);
+    setToasts((prev) => [...prev, { id, text, exiting: false, type }]);
     if (duration > 0) {
       setTimeout(() => {
         setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
@@ -134,7 +149,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       const url = shareCode ? `/api/g/${shareCode}` : '/api/daily';
       const res = await fetch(url).then((r) => r.json());
       if (!res.ok) {
-        showToast(res.error?.message ?? 'Failed to load game.', 5000);
+        showToast(res.error?.message ?? 'Failed to load game.', 5000, 'error');
         setLoading(false);
         return;
       }
@@ -158,11 +173,11 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       const json = await res.json();
       if (!json.ok) {
         if (json.error?.code === 'UNAUTHORIZED') {
-          showToast('Please log in to play.', 0);
+          showToast('Please log in to play.', 0, 'error');
         } else if (json.error?.code === 'REPLAY_FORBIDDEN') {
-          showToast('You already completed this game.', 0);
+          showToast('You already completed this game.', 0, 'info');
         } else {
-          showToast(json.error?.message ?? 'Failed to start game.', 5000);
+          showToast(json.error?.message ?? 'Failed to start game.', 5000, 'error');
         }
         return;
       }
@@ -222,7 +237,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
     if (!gameId || submitting || status !== 'IN_PROGRESS') return;
     const word = input.trim();
     if (word.length !== gameLength) {
-      showToast('Not enough letters');
+      showToast('Not enough letters', 1500, 'warning');
       setShakeRow(guesses.length);
       setTimeout(() => setShakeRow(-1), 400);
       return;
@@ -237,7 +252,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
     if (!json.ok) {
       setSubmitting(false);
       const msg = json.error?.message ?? 'Error submitting guess';
-      showToast(msg);
+      showToast(msg, 2000, 'error');
       setShakeRow(guesses.length);
       setTimeout(() => setShakeRow(-1), 400);
       return;
@@ -246,7 +261,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
     const currentRow = guesses.length;
     setRevealingRow(currentRow);
 
-    const flipDuration = gameLength * 100 + 500;
+    const flipDuration = gameLength * 150 + 500;
     setTimeout(async () => {
       const state = await fetch(`/api/games/${gameId}/state`).then((r) => r.json());
       if (state.ok) {
@@ -277,15 +292,17 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
 
           if (state.data.status === 'WIN') {
             setBounceRow(newGuesses.length - 1);
-            setTimeout(() => setBounceRow(-1), 1500);
+            setTimeout(() => setBounceRow(-1), 2000);
+            setConfetti(spawnConfetti());
+            setTimeout(() => setConfetti([]), 4000);
             const winMessages = ['Genius!', 'Magnificent!', 'Impressive!', 'Splendid!', 'Great!', 'Phew!'];
             const msgIndex = Math.min(newGuesses.length - 1, winMessages.length - 1);
-            showToast(winMessages[msgIndex], 3000);
+            showToast(winMessages[msgIndex], 3000, 'win');
           } else {
-            showToast(state.data.answer ?? 'Better luck next time!', 5000);
+            showToast(state.data.answer ?? 'Better luck next time!', 5000, 'loss');
           }
 
-          setTimeout(() => setShowStats(true), state.data.status === 'WIN' ? 2500 : 3000);
+          setTimeout(() => setShowStats(true), state.data.status === 'WIN' ? 3000 : 3500);
         }
       }
       setRevealingRow(-1);
@@ -298,6 +315,9 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
   const handleKey = useCallback(
     (key: string) => {
       if (status !== 'IN_PROGRESS' || submitting) return;
+      setPressedKey(key);
+      setTimeout(() => setPressedKey(''), 100);
+
       if (key === 'ENTER') {
         submitGuess();
       } else if (key === 'BACKSPACE') {
@@ -307,7 +327,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
         setInput((v) => v + key);
         const tileKey = `${guesses.length}-${newLen}`;
         setPoppedTile(tileKey);
-        setTimeout(() => setPoppedTile(''), 100);
+        setTimeout(() => setPoppedTile(''), 120);
       }
     },
     [status, input, gameLength, submitGuess, submitting, guesses.length]
@@ -330,37 +350,66 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
     const res = await fetch(`/api/games/${gameId}/hint`, { method: 'POST' });
     const json = await res.json();
     if (!json.ok) {
-      showToast(json.error?.message ?? 'No hints available');
+      showToast(json.error?.message ?? 'No hints available', 2000, 'error');
       return;
     }
     setHints((prev) => [...prev, json.data.hint]);
+    showToast('Hint revealed!', 1500, 'info');
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
         <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-correct animate-bounce" style={{ animationDelay: '0ms' }} />
-          <div className="w-2 h-2 rounded-full bg-present animate-bounce" style={{ animationDelay: '150ms' }} />
-          <div className="w-2 h-2 rounded-full bg-gray-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+          <div className="w-3 h-3 rounded-full bg-correct animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="w-3 h-3 rounded-full bg-present animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="w-3 h-3 rounded-full bg-gray-500 animate-bounce" style={{ animationDelay: '300ms' }} />
         </div>
       </div>
     );
   }
 
-  const tileSize = gameLength <= 5 ? 'w-16 h-16' : gameLength <= 7 ? 'w-12 h-12' : 'w-10 h-10';
-  const fontSize = gameLength <= 5 ? 'text-2xl' : gameLength <= 7 ? 'text-xl' : 'text-lg';
+  const tileSize = gameLength <= 5 ? 'w-[62px] h-[62px]' : gameLength <= 7 ? 'w-12 h-12' : 'w-10 h-10';
+  const fontSize = gameLength <= 5 ? 'text-[2rem]' : gameLength <= 7 ? 'text-xl' : 'text-lg';
   const maxDist = Math.max(1, ...Object.values(stats.guessDistribution));
+  const attemptsUsed = guesses.length;
+  const attemptsRemaining = maxAttempts - attemptsUsed;
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-3 relative">
+      {/* Confetti */}
+      {confetti.map((c) => (
+        <div
+          key={c.id}
+          className="confetti-piece"
+          style={{
+            left: c.left,
+            backgroundColor: c.color,
+            animationDelay: c.delay,
+            width: c.size,
+            height: c.size,
+            transform: `rotate(${c.rotation}deg)`,
+          }}
+        />
+      ))}
+
       {/* Toast container */}
       <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`bg-white text-gray-900 px-6 py-3 rounded-xl font-bold text-sm shadow-2xl pointer-events-auto ${
+            className={`px-6 py-3 rounded-xl font-bold text-sm shadow-2xl pointer-events-auto ${
               t.exiting ? 'toast-exit' : 'toast-enter'
+            } ${
+              t.type === 'win'
+                ? 'bg-correct text-white glow-green'
+                : t.type === 'loss'
+                ? 'bg-red-600 text-white'
+                : t.type === 'error'
+                ? 'bg-red-900 text-red-200 border border-red-700'
+                : t.type === 'warning'
+                ? 'bg-present text-white glow-yellow'
+                : 'bg-white text-gray-900'
             }`}
           >
             {t.text}
@@ -396,10 +445,39 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
         </div>
       )}
 
+      {/* Attempts progress */}
+      {status === 'IN_PROGRESS' && gameStarted && (
+        <div className="w-full max-w-sm">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Attempts</span>
+            <span className="text-[10px] text-gray-400">
+              {attemptsUsed}/{maxAttempts}
+            </span>
+          </div>
+          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ease-out relative ${
+                attemptsRemaining <= 1
+                  ? 'bg-red-500'
+                  : attemptsRemaining <= 2
+                  ? 'bg-present'
+                  : 'bg-correct'
+              }`}
+              style={{ width: `${(attemptsUsed / maxAttempts) * 100}%` }}
+            >
+              <div className="absolute inset-0 progress-shimmer" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hints panel */}
       {hints.length > 0 && (
         <div className="w-full max-w-sm glass rounded-xl p-4 space-y-2">
-          <p className="text-xs font-bold text-present uppercase tracking-wider">Hints</p>
+          <p className="text-xs font-bold text-present uppercase tracking-wider flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM4 11a1 1 0 100-2H3a1 1 0 000 2h1zM10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 110-12 6 6 0 010 12z"/></svg>
+            Hints
+          </p>
           {hints.map((h) => (
             <p key={h.id} className="text-sm text-gray-300">
               <span className="font-semibold text-white">{h.type}:</span> {h.content}
@@ -410,13 +488,14 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       )}
 
       {/* GAME BOARD */}
-      <div className="grid gap-1.5 my-2">
+      <div className="grid gap-[6px] my-2" role="grid" aria-label="Game board">
         {rows.map((row, ri) => {
           const isCurrentInputRow = !row.isSubmitted && ri === guesses.length && status === 'IN_PROGRESS';
           return (
             <div
               key={ri}
-              className={`flex gap-1.5 ${shakeRow === ri ? 'row-shake' : ''}`}
+              className={`flex gap-[6px] ${shakeRow === ri ? 'row-shake' : ''}`}
+              role="row"
             >
               {Array.from({ length: gameLength }).map((_, ci) => {
                 const ch = row.guessText[ci]?.trim() ? row.guessText[ci] : '';
@@ -437,7 +516,9 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
                 return (
                   <div
                     key={ci}
-                    className={`${tileClass(state)} ${tileSize} ${fontSize} ${animClass}`}
+                    className={`${tileClass(state, !!ch)} ${tileSize} ${fontSize} ${animClass}`}
+                    role="cell"
+                    aria-label={ch ? `${ch}, ${state}` : 'empty'}
                   >
                     {ch}
                   </div>
@@ -450,20 +531,28 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
 
       {/* Win / Loss message */}
       {status === 'WIN' && (
-        <div className="text-center space-y-2 animate-fade-in">
-          <p className="text-3xl font-black text-correct">You won!</p>
+        <div className="text-center space-y-3 celebrate-text">
+          <p className="text-4xl font-black text-gradient tracking-wider">You Won!</p>
           <p className="text-gray-400 text-sm">
-            Solved in {guesses.length} {guesses.length === 1 ? 'guess' : 'guesses'}
+            Solved in <span className="font-black text-correct text-lg">{guesses.length}</span> {guesses.length === 1 ? 'guess' : 'guesses'}
           </p>
+          {stats.currentStreak > 1 && (
+            <p className="text-sm streak-fire font-bold">
+              {stats.currentStreak} game streak!
+            </p>
+          )}
         </div>
       )}
       {status === 'LOSS' && (
-        <div className="text-center space-y-2 animate-fade-in">
-          <p className="text-3xl font-black text-red-500">Game over</p>
+        <div className="text-center space-y-3 loss-reveal">
+          <p className="text-4xl font-black text-red-500">Game Over</p>
           {answer && (
-            <p className="text-gray-400 text-sm">
-              The word was <span className="font-black uppercase tracking-widest text-white text-lg">{answer}</span>
-            </p>
+            <div className="space-y-2">
+              <p className="text-gray-400 text-sm">The word was</p>
+              <p className="font-black uppercase tracking-[0.3em] text-white text-2xl bg-gray-800 px-4 py-2 rounded-xl inline-block">
+                {answer}
+              </p>
+            </div>
           )}
         </div>
       )}
@@ -473,7 +562,7 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
         {status !== 'IN_PROGRESS' && (
           <>
             <button
-              className="bg-correct hover:bg-green-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-105 active:scale-95 glow-green"
+              className="bg-correct hover:bg-green-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-105 active:scale-95 glow-green flex items-center gap-2"
               onClick={async () => {
                 const header = status === 'WIN'
                   ? `Wordel ${guesses.length}/${maxAttempts}`
@@ -487,42 +576,53 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
                   )
                   .join('\n');
                 await navigator.clipboard.writeText(`${header}\n\n${grid}`);
-                showToast('Copied to clipboard!');
+                showToast('Copied to clipboard!', 1500, 'info');
               }}
             >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
               Share Result
             </button>
             <button
-              className="glass text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-105 active:scale-95"
+              className="glass text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
               onClick={() => setShowStats(true)}
             >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
               Statistics
             </button>
           </>
         )}
         {status === 'IN_PROGRESS' && gameStarted && (
           <button
-            className="text-sm text-present hover:text-yellow-400 font-medium transition-colors"
+            className="text-sm text-present hover:text-yellow-400 font-medium transition-all hover:scale-105 flex items-center gap-1.5"
             onClick={requestHint}
           >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
             Get a hint (costs points)
           </button>
         )}
       </div>
 
       {/* ON-SCREEN KEYBOARD */}
-      <div className="w-full max-w-lg space-y-1.5 mt-1">
+      <div className="w-full max-w-lg space-y-1.5 mt-2">
         {KEYBOARD_ROWS.map((row, ri) => (
-          <div key={ri} className="flex justify-center gap-1.5">
+          <div key={ri} className="flex justify-center gap-[5px]">
             {row.map((k) => {
               const state: LetterState = letterStates[k] ?? 'unused';
               const isWide = k === 'ENTER' || k === 'BACKSPACE';
+              const isPressed = pressedKey === k;
               return (
-                <button key={k} className={keyClass(state, isWide)} onClick={() => handleKey(k)}>
+                <button
+                  key={k}
+                  className={`${keyClass(state, isWide)} ${isPressed ? 'key-press' : ''}`}
+                  onClick={() => handleKey(k)}
+                  aria-label={k}
+                >
                   {k === 'BACKSPACE' ? (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414-6.414a2 2 0 011.414-.586H19a2 2 0 012 2v10a2 2 0 01-2 2h-8.172a2 2 0 01-1.414-.586L3 12z" />
                     </svg>
+                  ) : k === 'ENTER' ? (
+                    <span className="tracking-wider">ENTER</span>
                   ) : k}
                 </button>
               );
@@ -532,17 +632,17 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       </div>
 
       {/* Color legend */}
-      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded bg-correct" />
+      <div className="flex items-center gap-5 mt-3 text-xs text-gray-500">
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded bg-correct tile-correct-glow" />
           <span>Correct spot</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded bg-present" />
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded bg-present tile-present-glow" />
           <span>Wrong spot</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded bg-absent" />
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded bg-absent" />
           <span>Not in word</span>
         </div>
       </div>
@@ -550,18 +650,18 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
       {/* STATISTICS MODAL */}
       {showStats && (
         <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
           onClick={() => setShowStats(false)}
         >
           <div
-            className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 modal-enter"
+            className="bg-gray-900 border border-gray-700/50 rounded-2xl shadow-2xl max-w-sm w-full p-6 modal-enter"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-black tracking-wider uppercase text-white">Statistics</h2>
+              <h2 className="text-lg font-black tracking-wider uppercase text-gradient">Statistics</h2>
               <button
                 onClick={() => setShowStats(false)}
-                className="text-gray-500 hover:text-white text-2xl font-bold leading-none transition-colors"
+                className="text-gray-500 hover:text-white text-2xl font-bold leading-none transition-colors hover:rotate-90 duration-200"
               >
                 &times;
               </button>
@@ -575,8 +675,8 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
                 { value: stats.currentStreak, label: 'Current Streak' },
                 { value: stats.maxStreak, label: 'Max Streak' },
               ].map(({ value, label }) => (
-                <div key={label} className="text-center">
-                  <p className="text-3xl font-black text-white">{value}</p>
+                <div key={label} className="text-center group">
+                  <p className="text-3xl font-black text-white group-hover:text-correct transition-colors">{value}</p>
                   <p className="text-[10px] text-gray-500 leading-tight mt-1">{label}</p>
                 </div>
               ))}
@@ -596,8 +696,8 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
                     <div key={i} className="flex items-center gap-2">
                       <span className="text-sm font-bold w-3 text-right text-gray-400">{i + 1}</span>
                       <div
-                        className={`h-6 flex items-center justify-end px-2 text-xs font-bold text-white rounded transition-all ${
-                          isLastGuess ? 'bg-correct' : 'bg-gray-700'
+                        className={`h-7 flex items-center justify-end px-2.5 text-xs font-bold text-white rounded-md transition-all duration-500 ${
+                          isLastGuess ? 'bg-correct glow-green' : 'bg-gray-700'
                         }`}
                         style={{ width: `${width}%` }}
                       >
@@ -606,6 +706,14 @@ export function DailyGameClient({ shareCode, gameId: externalGameId, gameMeta }:
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Streak info */}
+            {stats.currentStreak > 1 && (
+              <div className="mt-6 text-center">
+                <p className="text-xs text-gray-500">Current streak</p>
+                <p className="text-2xl font-black streak-fire">{stats.currentStreak}</p>
               </div>
             )}
           </div>
